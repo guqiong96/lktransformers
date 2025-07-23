@@ -88,12 +88,34 @@ def load_cur_state_dict(module: nn.Module, gguf_loader: GGUFLoader, prefix: str 
             load_dequantized_tensor = gguf_loader.load_gguf_tensor
             tensor_file_map = gguf_loader.tensor_file_map
         
-        if translated_key in tensor_file_map:
+        if translated_key in tensor_file_map or translated_key.endswith('attn_kv_b.weight'):
             target_dtype = torch.get_default_dtype()
             device = get_device(translated_key[:translated_key.rfind(".")], gguf_loader.tensor_device_map)
             print(f"loading {translated_key} to {device}")
             torch.cuda.empty_cache()
-            weights = load_dequantized_tensor(translated_key, device=device).to(dtype=target_dtype)
+            if translated_key.endswith('attn_kv_b.weight'):
+                attn_k_b = load_dequantized_tensor(translated_key.replace("attn_kv_b.weight", "attn_k_b.weight"), device=device).to(dtype=target_dtype)
+                attn_v_b = load_dequantized_tensor(translated_key.replace("attn_kv_b.weight", "attn_v_b.weight"), device=device).to(dtype=target_dtype)
+                # 从张量形状中提取维度信息
+                num_heads = attn_k_b.size(0)
+                input_dim = attn_k_b.size(1)
+                head_dim_k = attn_k_b.size(2)
+                head_dim_v = attn_v_b.size(1)  # 原始V权重形状为 (num_heads, head_dim_v, input_dim)
+
+                # 优化点：直接调整K权重形状以匹配目标维度顺序
+                attn_k_b = attn_k_b.permute(0, 2, 1)  # 从 (num_heads, input_dim, head_dim_k) 变为 (num_heads, head_dim_k, input_dim)
+
+                # V权重已经是目标形状 (num_heads, head_dim_v, input_dim)，无需调整
+
+                # 沿特征维度拼接K和V权重 (dim=1)
+                kv_weights = torch.cat((attn_k_b, attn_v_b), dim=1)  # 形状: (num_heads, head_dim_k + head_dim_v, input_dim)
+
+                # 直接展平为目标形状
+                weights = kv_weights.reshape(num_heads * (head_dim_k + head_dim_v), input_dim)
+                del attn_k_b
+                del attn_v_b
+            else:
+                weights = load_dequantized_tensor(translated_key, device=device).to(dtype=target_dtype)
             set_param(module, name, weights)
             del weights
         else:

@@ -330,7 +330,7 @@ void KVCache::calc_anchor_all_layers(int *block_table, int *cache_seqlens,
 
     // Each task updates the importance of a certain block
     seq_len_ = config_.block_len;
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.layer_num * batch_size * max_block_num, nullptr,
         [&](int task_id) {
             int layer_id = task_id / (batch_size * max_block_num);
@@ -1020,7 +1020,7 @@ void KVCache::clear_importance_all_layers(int *block_table, int *cache_seqlens,
 
     // Each task updates the importance of a certain block
     seq_len_ = config_.block_len;
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.layer_num * batch_size * max_block_num, nullptr,
         [&](int task_id) {
             int layer_id = task_id / (batch_size * max_block_num);
@@ -1062,7 +1062,7 @@ void KVCache::clear_kvcache_all_layers(int *block_table, int *cache_seqlens,
 
     // Each task updates the importance of a certain block
     seq_len_ = config_.block_len;
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.layer_num * batch_size * max_block_num * config_.kv_head_num,
         nullptr,
         [&](int task_id) {

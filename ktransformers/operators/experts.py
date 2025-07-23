@@ -146,20 +146,20 @@ class KExpertsCPU(KExpertsBase):
         if device:
             assert device.lower() == "cpu", "KExpertsCPU can only be loaded on CPU, Parameter \"device\" can be cpu or None."
         if w is None: w = self.load_weights()[self.key]
-        self.gate = w["gate"]
-        self.up = w["up"]
-        self.down = w["down"]
+        gate = w["gate"]
+        up = w["up"]
+        down = w["down"]
         self.gate_type = w["gate_type"]
         self.up_type = w["up_type"]
         self.down_type = w["down_type"]
         gate_ptr = ctypes.addressof(
-            ctypes.cast(self.gate.ctypes.data, ctypes.POINTER(ctypes.c_uint64)).contents
+            ctypes.cast(gate, ctypes.POINTER(ctypes.c_uint8)).contents
         )
         up_ptr = ctypes.addressof(
-            ctypes.cast(self.up.ctypes.data, ctypes.POINTER(ctypes.c_uint64)).contents
+            ctypes.cast(up, ctypes.POINTER(ctypes.c_uint8)).contents
         )
         down_ptr = ctypes.addressof(
-            ctypes.cast(self.down.ctypes.data, ctypes.POINTER(ctypes.c_uint64)).contents
+            ctypes.cast(down, ctypes.POINTER(ctypes.c_uint8)).contents
         )
         #print(self.gate_type, self.up_type, self.down_type)
         n_routed_experts = self.n_routed_experts
@@ -194,7 +194,8 @@ class KExpertsCPU(KExpertsBase):
             KExpertsCPU.expert_ids_cpu = torch.zeros((num_experts_per_tok), device="cpu", dtype=torch.long, pin_memory=True)
             KExpertsCPU.weights_cpu = torch.zeros((num_experts_per_tok), device="cpu", dtype=torch.float32, pin_memory=True)
             KExpertsCPU.output_cpu = torch.zeros((self.config.hidden_size), device="cpu", pin_memory=True, dtype=torch.bfloat16)
-            
+        del w
+           
     def submit_for_one_decode(self, input_tensor, expert_ids, weights):
         KExpertsCPU.input_tensor_cpu.copy_(input_tensor, non_blocking=True)
         KExpertsCPU.expert_ids_cpu.copy_(expert_ids, non_blocking=True)
@@ -257,9 +258,9 @@ class KExpertsCPU(KExpertsBase):
                 down_type = self.gguf_loader.safetensor_loader.load_tensor(key + ".ffn_down_exps.ggml_type").item()
             
             elif key + ".ffn_gate_exps.weight" in self.gguf_loader.tensor_info:
-                gate = self.gguf_loader.get_mmap_tensor(key + ".ffn_gate_exps.weight")
-                up = self.gguf_loader.get_mmap_tensor(key + ".ffn_up_exps.weight")
-                down = self.gguf_loader.get_mmap_tensor(key + ".ffn_down_exps.weight")
+                gate = self.gguf_loader.get_tensor_bytes(key + ".ffn_gate_exps.weight")
+                up = self.gguf_loader.get_tensor_bytes(key + ".ffn_up_exps.weight")
+                down = self.gguf_loader.get_tensor_bytes(key + ".ffn_down_exps.weight")
                 gate_type = self.gguf_loader.tensor_info[key + ".ffn_gate_exps.weight"]["ggml_type"]
                 up_type = self.gguf_loader.tensor_info[key + ".ffn_up_exps.weight"]["ggml_type"]
                 down_type = self.gguf_loader.tensor_info[key + ".ffn_down_exps.weight"]["ggml_type"]
@@ -269,9 +270,9 @@ class KExpertsCPU(KExpertsBase):
                 up = []
                 down = []
                 for i in range(8):
-                    gate_it = self.gguf_loader.get_mmap_tensor(f"{key}.ffn_gate.{i}.weight")
-                    up_it = self.gguf_loader.get_mmap_tensor(f"{key}.ffn_up.{i}.weight")
-                    down_it = self.gguf_loader.get_mmap_tensor(f"{key}.ffn_down.{i}.weight")
+                    gate_it = self.gguf_loader.get_tensor_bytes(f"{key}.ffn_gate.{i}.weight")
+                    up_it = self.gguf_loader.get_tensor_bytes(f"{key}.ffn_up.{i}.weight")
+                    down_it = self.gguf_loader.get_tensor_bytes(f"{key}.ffn_down.{i}.weight")
                     gate.append(gate_it)
                     up.append(up_it)
                     down.append(down_it)
@@ -368,9 +369,9 @@ class KExpertsMarlin(KExpertsBase):
 
         for key in keys:
             if key + ".ffn_gate_exps.weight" in self.gguf_loader.tensor_info:
-                gate = self.gguf_loader.get_mmap_tensor(key + ".ffn_gate_exps.weight")
-                up = self.gguf_loader.get_mmap_tensor(key + ".ffn_up_exps.weight")
-                down = self.gguf_loader.get_mmap_tensor(key + ".ffn_down_exps.weight")
+                gate = self.gguf_loader.get_tensor_bytes(key + ".ffn_gate_exps.weight")
+                up = self.gguf_loader.get_tensor_bytes(key + ".ffn_up_exps.weight")
+                down = self.gguf_loader.get_tensor_bytes(key + ".ffn_down_exps.weight")
             res = {"gate": gate, "up": up, "down": down}
         return res
 
@@ -485,9 +486,9 @@ class KExpertsTorch(KExpertsBase):
 
         for key in keys:
             if key + ".ffn_gate_exps.weight" in self.gguf_loader.tensor_info:
-                gate = self.gguf_loader.get_mmap_tensor(key + ".ffn_gate_exps.weight")
-                up = self.gguf_loader.get_mmap_tensor(key + ".ffn_up_exps.weight")
-                down = self.gguf_loader.get_mmap_tensor(key + ".ffn_down_exps.weight")
+                gate = self.gguf_loader.get_tensor_bytes(key + ".ffn_gate_exps.weight")
+                up = self.gguf_loader.get_tensor_bytes(key + ".ffn_up_exps.weight")
+                down = self.gguf_loader.get_tensor_bytes(key + ".ffn_down_exps.weight")
             res = {"gate": gate, "up": up, "down": down}
         return res
 

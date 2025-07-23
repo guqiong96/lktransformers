@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "../../cpu_backend/backend.h"
+#include "../../cpu_backend/backend_numa.h"
 #include "conversion.h"
 #include "llama.cpp/ggml-impl.h"
 #include "llama.cpp/ggml-quants.h"
@@ -50,6 +51,19 @@ class Linear {
    private:
     LinearConfig config_;
     void* proj_;  // [output_size * input_size ( /32 if quantized)]
+
+    #ifdef USE_NUMA
+    std::vector<void*> proj_numa_;
+    std::vector<size_t> proj_numa_size_; 
+    size_t stride_bytes_;
+    struct NumaBlock {
+        int node_id;
+        int start_block;
+        int num_blocks;
+    };
+    std::vector<NumaBlock> proj_blocks_;
+
+    #endif
 
     float* input_fp32_;    // [group_max_len * input_size]
     uint8_t* proj_input_;  // [group_max_len * input_size * ggml_type_size(ggml_internal_get_type_traits(proj_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(proj_type).vec_dot_type)]

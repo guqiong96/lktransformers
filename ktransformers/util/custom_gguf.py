@@ -203,8 +203,8 @@ class GGUFLoader:
                     file_name = os.path.join(root, file)
                     with open(file_name, "rb") as f:
                         self.load_gguf(f)
-                        if file_name not in self.file_data_map:
-                            self.file_data_map[file_name] = np.memmap(file_name, mode = 'r')
+                        # if file_name not in self.file_data_map:
+                        #     self.file_data_map[file_name] = np.memmap(file_name, mode = 'r')
         if not found_gguf:
             raise FileNotFoundError(f"Cannot find any .gguf files in: {gguf_path}")
                             
@@ -300,9 +300,25 @@ class GGUFLoader:
         itemsize = int(np.empty([], dtype = item_type).itemsize)
         return mmap_data[offset : offset + itemsize * item_count]
     
+    def get_tensor_bytes(self, name: str) -> bytes:
+        t = self.tensor_info[name]
+        file_path = self.tensor_file_map[name]
+        
+        # 计算数据类型和所需字节数
+        dtype = np.dtype(t["item_type"])
+        num_bytes = dtype.itemsize * t["item_count"]
+        offset = t["offset"]
+        
+        # 直接读取文件内容
+        with open(file_path, 'rb') as f:
+            # 跳转到指定偏移位置
+            f.seek(offset)
+            # 读取精确数量的字节
+            return f.read(num_bytes)
+    
     def get_undequanted_tensor_and_ggml_type(self, name):
         t = self.tensor_info[name]
-        data = self.get_mmap_tensor(name)
+        data = self.get_tensor_bytes(name)
         ggml_type = t["ggml_type"]
         data = torch.from_numpy(data)
         return data, ggml_type
@@ -352,7 +368,7 @@ class GGUFLoader:
 
         ggml_name = GGML_NAMES[ggml_type]
 
-        data = self.get_mmap_tensor(name)
+        data = self.get_tensor_bytes(name)
 
         block_size = GGML_BLOCK_SIZES[ggml_name]
         elements_per_block = GGML_ELEMENTS_PER_BLOCK[ggml_name]
@@ -397,6 +413,7 @@ class GGUFLoader:
             values = (values.reshape(n_head, values.shape[0] // n_head // 2, 2, *values.shape[1:])
             .swapaxes(1, 2)
             .reshape(values.shape))
+        del data
         return values
 
 def read_value(f, data_type):
@@ -571,7 +588,7 @@ def dequantize_q4_k(data):
 def dequantize_q4_k_gpu(data, device:str ="cuda", target_dtype = torch.get_default_dtype()):
     block_size = GGML_BLOCK_SIZES["Q4_K"]
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["Q4_K"]
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     device = torch.device(device)
     # TODO: this and from_numpy in other functions will cause a warning saying that numpy is not writable, 
     # the best way to fix this is transfer ptr to KTransformersOps instead of Tensor.
@@ -693,12 +710,12 @@ def dequantize_q6_k(data):
     ], axis=1) 
 
 # @torch.jit.script
-def dequantize_q6_k_gpu(data: np.ndarray, device:str = "cuda", target_dtype = torch.get_default_dtype()):
+def dequantize_q6_k_gpu(data: bytes, device:str = "cuda", target_dtype = torch.get_default_dtype()):
     block_size = GGML_BLOCK_SIZES["Q6_K"]
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["Q6_K"]
     device = torch.device(device)
     num_blocks = len(data) // block_size
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     c_pointer = ctypes.addressof(ctypes.cast(data.ctypes.data, ctypes.POINTER(ctypes.c_int8)).contents)
     return KTransformersOps.dequantize_q6_k(c_pointer, data.size, block_size, ele_per_blk, device, target_dtype)
 
@@ -801,7 +818,7 @@ def dequantize_q8_0_gpu(data, device:str = "cuda", target_dtype = torch.get_defa
     block_size = GGML_BLOCK_SIZES["Q8_0"]
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["Q8_0"]
     device = torch.device(device)
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     c_pointer = ctypes.addressof(ctypes.cast(data.ctypes.data, ctypes.POINTER(ctypes.c_int8)).contents)
     return KTransformersOps.dequantize_q8_0(c_pointer, data.size, block_size, ele_per_blk, device, target_dtype)
 

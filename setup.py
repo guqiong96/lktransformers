@@ -245,7 +245,7 @@ class BuildWheelsCommand(_bdist_wheel):
         wheel_filename, wheel_url = self.get_wheel_name()
         print("Guessing wheel URL: ", wheel_url)
         try:
-            urllib.request.urlretrieve(wheel_url, wheel_filename)
+            # urllib.request.urlretrieve(wheel_url, wheel_filename)
             # Make the archive
             # Lifted from the root wheel processing command
             # https://github.com/pypa/wheel/blob/cf71108ff9f6ffc36978069acb28824b44ae028e/src/wheel/bdist_wheel.py#LL381C9-L381C85

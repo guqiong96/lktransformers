@@ -9,6 +9,9 @@
  **/
 #ifndef CPUINFER_OPERATOR_MOE_H
 #define CPUINFER_OPERATOR_MOE_H
+#ifndef USE_NUMA
+#define USE_NUMA
+#endif
 
 #include <cmath>
 #include <cstdio>
@@ -16,7 +19,7 @@
 #include <mutex>
 #include <vector>
 
-#include "../../cpu_backend/backend.h"
+#include "../../cpu_backend/backend_numa.h"
 #include "conversion.h"
 #include "llama.cpp/ggml-impl.h"
 #include "llama.cpp/ggml-quants.h"
@@ -39,13 +42,14 @@ struct MOEConfig {
     ggml_type up_type;
     ggml_type down_type;
     ggml_type hidden_type;
+    
 
     MOEConfig() {}
 
     MOEConfig(int expert_num, int routed_expert_num, int hidden_size, int intermediate_size, int stride, int group_min_len, int group_max_len, void* gate_proj, void* up_proj, void* down_proj, ggml_type gate_type, ggml_type up_type, ggml_type down_type, ggml_type hidden_type)
         : expert_num(expert_num), routed_expert_num(routed_expert_num), hidden_size(hidden_size), intermediate_size(intermediate_size), stride(stride), group_min_len(group_min_len), group_max_len(group_max_len), gate_proj(gate_proj), up_proj(up_proj), down_proj(down_proj), gate_type(gate_type), up_type(up_type), down_type(down_type), hidden_type(hidden_type) {}
 };
-
+ 
 class MOE {
    public:
     MOE(MOEConfig);
@@ -62,9 +66,25 @@ class MOE {
     void* down_proj_;  // [expert_num * hidden_size * intermediate_size ( /32 if quantized)]
 
     #ifdef USE_NUMA
-    std::vector<void*> gate_proj_numa_;  // [numa_num, expert_num * intermediate_size * hidden_size ( /32 if quantized)]
-    std::vector<void*> up_proj_numa_;    // [numa_num, expert_num * intermediate_size * hidden_size ( /32 if quantized)]
-    std::vector<void*> down_proj_numa_;  // [numa_num, expert_num * hidden_size * intermediate_size ( /32 if quantized)]
+    std::vector<void*> gate_numa_;  // [numa_num, nth * stride * expert_num * hidden_size ( /32 if quantized)]
+    std::vector<void*> up_numa_;    // [numa_num, nth * stride * expert_num * hidden_size ( /32 if quantized)]
+    std::vector<void*> down_numa_;  // [numa_num, nth * stride * expert_num *  intermediate_size ( /32 if quantized)]
+    std::vector<size_t> gate_numa_size_;
+    std::vector<size_t> up_numa_size_;
+    std::vector<size_t> down_numa_size_; 
+    size_t stride_gate_bytes_;
+    size_t stride_up_bytes_; 
+    size_t stride_down_bytes_;
+    struct NumaBlock {
+        int node_id;
+        int start_block;
+        int num_blocks;
+    };
+    std::vector<NumaBlock> gate_up_blocks_;
+    std::vector<NumaBlock> down_blocks_;
+
+    std::vector<NumaBlock> m_gate_up_blocks_;
+    std::vector<NumaBlock> m_down_blocks_;
     #endif
 
     float* s_input_fp32_;                      // [hidden_size]
@@ -98,6 +118,7 @@ class MOE {
     std::vector<float*> m_local_intermediate_fp32_ptr_;  // [expert_num]
     std::vector<uint8_t*> m_local_down_input_ptr_;       // [expert_num]
     std::vector<float*> m_local_down_output_ptr_;        // [expert_num]
+
 };
 
 #endif

@@ -68,7 +68,7 @@ void KVCache::update_importance_one_block(const ggml_fp16_t *importance,
     importance_data_ = const_cast<uint16_t *>(importance);
 
     // Each task updates the importance of a certain position
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.block_len, nullptr,
         [&](int task_id) {
             int k = task_id;
@@ -95,7 +95,7 @@ void KVCache::get_importance_one_block(ggml_fp16_t *importance, int layer_id,
     importance_data_ = const_cast<uint16_t *>(importance);
 
     // Each task updates the importance of a certain position
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.block_len, nullptr,
         [&](int task_id) {
             int k = task_id;
@@ -140,7 +140,7 @@ void KVCache::update_kvcache_one_block_fp16(const ggml_fp16_t *k_in,
     }
 
     // Each task updates the k cache or v cache of a certain header
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.kv_head_num * 2, nullptr,
         [&](int task_id) {
             std::vector<float> block_fp32(32);
@@ -213,7 +213,7 @@ void KVCache::get_kvcache_one_block_fp16(ggml_fp16_t *k_in, ggml_fp16_t *v_in,
 
     // printf("layer_id: %d, block_idx: %d\n", layer_id, block_idx);
     // Each task gets the k cache or v cache of a certain header
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.kv_head_num * 2, nullptr,
         [&](int task_id) {
             std::vector<float> block_fp32(32);
@@ -282,7 +282,7 @@ void KVCache::get_and_update_kvcache_fp16(ggml_fp16_t *k_in, ggml_fp16_t *v_in,
     v_data_ = const_cast<uint16_t *>(v_in);
 
     // Each task updates the k cache and v cache of a certain header
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.kv_head_num * max_block_num * batch_size, nullptr,
         [&](int task_id) {
             // printf("block_idx: %d, task_id: %d\n", block_idx, task_id);
@@ -606,7 +606,7 @@ void KVCache::update_importance(const ggml_fp16_t *importance, int layer_id,
     importance_data_ = const_cast<uint16_t *>(importance);
 
     // Each task updates the importance of a certain position
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         max_block_num * batch_size, nullptr,
         [&](int task_id) {
             int block_id = task_id % max_block_num;
@@ -654,7 +654,7 @@ void KVCache::get_kvcache_fp16(ggml_fp16_t *k_in, ggml_fp16_t *v_in,
     v_data_ = const_cast<uint16_t *>(v_in);
 
     // Each task updates the k cache and v cache of a certain header
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.kv_head_num * max_block_num * batch_size, nullptr,
         [&](int task_id) {
             // printf("block_idx: %d, task_id: %d\n", block_idx, task_id);
@@ -823,7 +823,7 @@ void KVCache::update_kvcache_fp16(const ggml_fp16_t *k_in,
     k_data_ = const_cast<uint16_t *>(k_in);
     v_data_ = const_cast<uint16_t *>(v_in);
     // Each task updates the k cache and v cache of a certain header
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         batch_size * config_.kv_head_num * q_len, nullptr,
         [&](int task_id) {
             int batch_id = task_id / (config_.kv_head_num * q_len);
@@ -945,7 +945,7 @@ void KVCache::get_all_kvcache_one_layer(int layer_id, ggml_fp16_t *k_in,
     v_data_ = reinterpret_cast<uint16_t *>(v_in);
 
     // Each task gets the k cache or v cache of a certain header
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         config_.kv_head_num * past_block_num_[layer_id] * 2, nullptr,
         [&](int task_id) {
             std::vector<float> block_fp32(32);

@@ -46,22 +46,22 @@ def marlin_permute_weights(q_w, size_k, size_n, perm, tile=MARLIN_TILE):
 
 
 def marlin_weights(q_w, size_k, size_n, num_bits, perm):
-    # Permute
+    # 保持张量在PyTorch中
     q_w = marlin_permute_weights(q_w, size_k, size_n, perm)
-
-    # Pack
+    
     pack_factor = get_pack_factor(num_bits)
-    orig_device = q_w.device
-
-    q_w = q_w.cpu().numpy().astype(numpy.uint32)
-
-    q_packed = numpy.zeros((q_w.shape[0], q_w.shape[1] // pack_factor),
-                           dtype=numpy.uint32)
+    num_rows, num_cols = q_w.shape
+    
+    # 预分配结果张量
+    q_packed = torch.zeros((num_rows, num_cols // pack_factor), 
+                          dtype=torch.int32, device=q_w.device)
+    
+    # 直接在GPU/CPU上操作避免复制
     for i in range(pack_factor):
-        q_packed |= q_w[:, i::pack_factor] << num_bits * i
-
-    q_packed = torch.from_numpy(q_packed.astype(numpy.int32)).to(orig_device)
-
+        sliced = q_w[:, i::pack_factor]  # 获取切片（视图操作，无复制）
+        shifted = sliced << (num_bits * i)  # 移位（延迟计算）
+        q_packed |= shifted  # 原位累加
+        
     return q_packed
 
 
