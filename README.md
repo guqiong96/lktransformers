@@ -1,5 +1,7 @@
 最新版ktransformers需要安装aio库，  sudo dnf install libaio-devel 或者 sudo sudo apt-get install libaio-dev
 
+这个分支优化了numa内存使用，多个numa节点只用一份内存，32个节点上均衡，解码速度不下降，略有提升。
+
 git clone https://github.com/guqiong96/ktransformers.git
 
 git checkout full-support-numa
