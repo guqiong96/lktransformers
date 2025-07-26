@@ -23,7 +23,7 @@ model_name = "/data/Qwen2-57B-A14B-Instruct"
 key = "blk.0."
 target = "ffn_up_exps.weight"
 
-data = gguf_config.get_mmap_tensor(key + target)
+data = gguf_config.get_tensor_bytes(key + target)
 
 _, factors, offsets, qs1, qs2= dequantize_q4_k(data)
 factors_cpu = torch.from_numpy(factors)

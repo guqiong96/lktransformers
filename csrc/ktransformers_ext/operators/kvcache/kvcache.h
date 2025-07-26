@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "../../cpu_backend/backend.h"
+#include "../../cpu_backend/backend_numa.h"
 #include "llama.cpp/ggml-common.h"
 #include "llama.cpp/ggml-impl.h"
 #include "llama.cpp/ggml-quants.h"

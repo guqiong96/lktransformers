@@ -28,9 +28,9 @@ Backend::Backend(int max_thread_num) {
             std::make_unique<std::atomic<ThreadStatus>>(ThreadStatus::WAITING);
     }
     workers_.resize(max_thread_num_);
-    for (int i = 1; i < max_thread_num_; i++) {
-        workers_[i] = std::thread(&Backend::worker_thread, this, i);
-    }
+    // for (int i = 1; i < max_thread_num_; i++) {
+    //     workers_[i] = std::thread(&Backend::worker_thread, this, i);
+    // }
 }
 
 Backend::~Backend() {
@@ -38,11 +38,11 @@ Backend::~Backend() {
         thread_state_[i].status->store(ThreadStatus::EXIT,
                                        std::memory_order_release);
     }
-    for (int i = 1; i < max_thread_num_; i++) {
-        if (workers_[i].joinable()) {
-            workers_[i].join();
-        }
-    }
+    // for (int i = 1; i < max_thread_num_; i++) {
+    //     if (workers_[i].joinable()) {
+    //         workers_[i].join();
+    //     }
+    // }
 }
 
 int Backend::get_thread_num() { return max_thread_num_; }

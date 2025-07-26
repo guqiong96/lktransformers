@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "../../cpu_backend/backend.h"
+#include "../../cpu_backend/backend_numa.h"
 #include "../../cpu_backend/shared_mem_buffer.h"
 #include "conversion.h"
 #include "llama.cpp/ggml-impl.h"
@@ -54,6 +55,18 @@ class Linear {
     float* input_fp32_;    // [group_max_len * input_size]
     uint8_t* proj_input_;  // [group_max_len * input_size * ggml_type_size(ggml_internal_get_type_traits(proj_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(proj_type).vec_dot_type)]
     float* proj_output_;   // [group_max_len * output_size]
+    #ifdef USE_NUMA
+    std::vector<void*> proj_numa_;
+    std::vector<size_t> proj_numa_size_; 
+    size_t stride_bytes_;
+    struct NumaBlock {
+        int node_id;
+        int start_block;
+        int num_blocks;
+    };
+    std::vector<NumaBlock> proj_blocks_;
+
+    #endif
 };
 
 #endif

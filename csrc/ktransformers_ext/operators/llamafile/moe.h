@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "../../cpu_backend/backend.h"
+#include "../../cpu_backend/backend_numa.h"
 #include "../../cpu_backend/shared_mem_buffer.h"
 #include "conversion.h"
 #include "llama.cpp/ggml-impl.h"
@@ -62,9 +63,25 @@ class MOE {
     void* down_proj_;  // [expert_num * hidden_size * intermediate_size ( /32 if quantized)]
 
     #ifdef USE_NUMA
-    std::vector<void*> gate_proj_numa_;  // [numa_num, expert_num * intermediate_size * hidden_size ( /32 if quantized)]
-    std::vector<void*> up_proj_numa_;    // [numa_num, expert_num * intermediate_size * hidden_size ( /32 if quantized)]
-    std::vector<void*> down_proj_numa_;  // [numa_num, expert_num * hidden_size * intermediate_size ( /32 if quantized)]
+    std::vector<void*> gate_numa_;  // [numa_num, nth * stride * expert_num * hidden_size ( /32 if quantized)]
+    std::vector<void*> up_numa_;    // [numa_num, nth * stride * expert_num * hidden_size ( /32 if quantized)]
+    std::vector<void*> down_numa_;  // [numa_num, nth * stride * expert_num *  intermediate_size ( /32 if quantized)]
+    std::vector<size_t> gate_numa_size_;
+    std::vector<size_t> up_numa_size_;
+    std::vector<size_t> down_numa_size_; 
+    size_t stride_gate_bytes_;
+    size_t stride_up_bytes_; 
+    size_t stride_down_bytes_;
+    struct NumaBlock {
+        int node_id;
+        int start_block;
+        int num_blocks;
+    };
+    std::vector<NumaBlock> gate_up_blocks_;
+    std::vector<NumaBlock> down_blocks_;
+
+    std::vector<NumaBlock> m_gate_up_blocks_;
+    std::vector<NumaBlock> m_down_blocks_;
     #endif
 
     float* s_input_fp32_;                      // [hidden_size]

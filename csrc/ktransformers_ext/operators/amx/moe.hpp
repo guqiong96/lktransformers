@@ -222,7 +222,7 @@ public:
 
   void load_weights(Backend *backend) {
     int nth = T::recommended_nth(config_.intermediate_size);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         nth * config_.expert_num, nullptr,
         [&](int task_id) {
           uint64_t expert_idx = task_id / nth;
@@ -247,7 +247,7 @@ public:
         },
         nullptr);
     nth = T::recommended_nth(config_.hidden_size);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         nth * config_.expert_num, nullptr,
         [&](int task_id) {
           uint64_t expert_idx = task_id / nth;
@@ -297,7 +297,7 @@ public:
       m_local_down_output_ptr_[i] = m_local_down_output_ + offset * config_.hidden_size;
       offset += m_local_num_[i];
     }
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         qlen, nullptr,
         [&](int i) {
           for (int j = 0; j < k; j++) {
@@ -306,7 +306,7 @@ public:
           }
         },
         nullptr);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         activated_expert, nullptr,
         [&](int task_id) {
           int expert_idx = m_expert_id_map_[task_id];
@@ -315,7 +315,7 @@ public:
         },
         nullptr);
     int nth = T::recommended_nth(config_.intermediate_size);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         nth * activated_expert, [&](int _) { T::config(); },
         [&](int task_id) {
           int expert_idx = m_expert_id_map_[task_id / nth];
@@ -350,7 +350,7 @@ public:
           }
         },
         nullptr);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         activated_expert, nullptr,
         [&](int task_id) {
           int expert_idx = m_expert_id_map_[task_id];
@@ -358,7 +358,7 @@ public:
         },
         nullptr);
     nth = T::recommended_nth(config_.hidden_size);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         nth * activated_expert, [&](int _) { T::config(); },
         [&](int task_id) {
           int expert_idx = m_expert_id_map_[task_id / nth];
@@ -373,7 +373,7 @@ public:
           down_bc_[expert_idx]->to_mat(m_local_num_[expert_idx], m_local_down_output_ptr_[expert_idx], ith, nth);
         },
         nullptr);
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         qlen, nullptr,
         [&](int i) {
           for (int e = 0; e < config_.hidden_size; e += 32) {

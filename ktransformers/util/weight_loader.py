@@ -219,8 +219,8 @@ class GGUFLoader(ModelLoader):
                     file_path = os.path.join(root, file)
                     with open(file_path, "rb") as f:
                         self._load_gguf(f)
-                        if file_path not in self.file_data_map:
-                            self.file_data_map[file_path] = np.memmap(file_path, mode='r')
+                        # if file_path not in self.file_data_map:
+                        #     self.file_data_map[file_path] = np.memmap(file_path, mode='r')
         
         if not found_gguf:
             raise FileNotFoundError(f"Cannot find any .gguf files in: {self.gguf_path}")

@@ -283,8 +283,8 @@ class GGUFLoader(ModelLoader):
                     file_name = os.path.join(root, file)
                     with open(file_name, "rb") as f:
                         self.load_gguf(f)
-                        if file_name not in self.file_data_map:
-                            self.file_data_map[file_name] = np.memmap(file_name, mode = 'r')
+                        #if file_name not in self.file_data_map:
+                        #    self.file_data_map[file_name] = np.memmap(file_name, mode = 'r')
         if not found_gguf:
             raise FileNotFoundError(f"Cannot find any .gguf files in: {gguf_path}")
                             
@@ -380,11 +380,28 @@ class GGUFLoader(ModelLoader):
         item_count = t["item_count"]
         itemsize = int(np.empty([], dtype = item_type).itemsize)
         return mmap_data[offset : offset + itemsize * item_count]
-
+    
+    def get_tensor_bytes(self, name: str) -> bytes:
+        name = translate_name_to_gguf(name)
+        t = self.tensor_info[name]
+        file_path = self.tensor_file_map[name]
+        
+        # 计算数据类型和所需字节数
+        dtype = np.dtype(t["item_type"])
+        num_bytes = dtype.itemsize * t["item_count"]
+        offset = t["offset"]
+        
+        # 直接读取文件内容
+        with open(file_path, 'rb') as f:
+            # 跳转到指定偏移位置
+            f.seek(offset)
+            # 读取精确数量的字节
+            return f.read(num_bytes)
+        
     def get_undequanted_tensor_and_ggml_type(self, name):
         name = translate_name_to_gguf(name)
         t = self.tensor_info[name]
-        data = self.get_mmap_tensor(name)
+        data = self.get_tensor_bytes(name)
         ggml_type = t["ggml_type"]
         data = torch.from_numpy(data)
         return data, ggml_type
@@ -432,7 +449,7 @@ class GGUFLoader(ModelLoader):
 
         ggml_name = GGML_NAMES[ggml_type]
 
-        data = self.get_mmap_tensor(name)
+        data = self.get_tensor_bytes(name)
 
         block_size = GGML_BLOCK_SIZES[ggml_name]
         elements_per_block = GGML_ELEMENTS_PER_BLOCK[ggml_name]

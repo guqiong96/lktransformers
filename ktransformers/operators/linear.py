@@ -769,13 +769,13 @@ class KLinearCPUInfer(KLinearBase):
     def load(self, w: dict | nn.Parameter | tuple | None = None, device: str|None = None, warmup:bool = True):
         print(f"loading {self.key} to {self.device} using CPUInfer")
         if device is None: device = self.device
-        self.load_weights(w=w, device=device)
+        weight = self.load_weights(w=w, device=device)
         if self.bias is not None:
             self.has_bias = True
             self.bias = self.bias.to(device)
             
         weight_ptr = ctypes.addressof(
-            ctypes.cast(self.weight.ctypes.data, ctypes.POINTER(ctypes.c_uint64)).contents
+           ctypes.cast(weight, ctypes.POINTER(ctypes.c_uint8)).contents
         )
         config = cpuinfer_ext.linear.LinearConfig(self.in_features, self.out_features, self.stride, self.group_max_len, weight_ptr, self.weight_type, 30)
         self.linear = cpuinfer_ext.linear.Linear(config)
@@ -786,17 +786,19 @@ class KLinearCPUInfer(KLinearBase):
         self.input_tensor_cpu = torch.zeros((1, 1, self.in_features), device="cpu", pin_memory=True)
         self.output_cpu = torch.zeros((1, 1, self.out_features), device="cpu", pin_memory=True, dtype=torch.bfloat16)
         self.output_gpu = torch.zeros((1, 1, self.out_features), device=self.out_device)
+        del weight
 
     def load_weights(self, w: dict | nn.Parameter | tuple | None = None, device: str = "cpu"):
         if self.gguf_loader.has_tensor(self.key + ".weight"):
             if self.key + ".bias" in self.gguf_loader.tensor_file_map:
-                self.weight = self.gguf_loader.get_mmap_tensor(self.key + ".weight")
+                weight = self.gguf_loader.get_tensor_bytes(self.key + ".weight")
                 self.weight_type = self.gguf_loader.tensor_info[self.key + ".weight"]["ggml_type"]
                 self.bias = self.gguf_loader.load_gguf_tensor(self.key + ".bias", device=device)
             else:
-                self.weight = self.gguf_loader.get_mmap_tensor(self.key + ".weight")
+                weight = self.gguf_loader.get_tensor_bytes(self.key + ".weight")
                 self.weight_type = self.gguf_loader.tensor_info[self.key + ".weight"]["ggml_type"]
                 self.bias = None
+            return weight
         else:
             raise ValueError(f"Linear {self.key} not found in gguf_loader")
 

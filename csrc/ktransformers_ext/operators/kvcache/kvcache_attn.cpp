@@ -19,7 +19,7 @@ void KVCache::attention_kvhead_(const uint16_t *q_in_data, ggml_fp16_t *output,
     auto start = std::chrono::high_resolution_clock::now();
     seq_len_ = config_.block_len;
 
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         batch_size * config_.kv_head_num * max_block_num_after_retrieval_,
         [&](int thread_id) {
             thread_cur_head_idx_[thread_id].first = -1;
@@ -359,7 +359,7 @@ void KVCache::attention_layer_(const uint16_t *q_in_data, ggml_fp16_t *output,
     // Timer start
     auto start = std::chrono::high_resolution_clock::now();
     seq_len_ = config_.block_len;
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         batch_size * config_.kv_head_num * max_block_num_after_retrieval_,
         [&](int thread_id) {
             thread_cur_head_idx_[thread_id].first = -1;
@@ -910,7 +910,7 @@ void KVCache::calculate_block_similarity_layer_(
             }
             if (is_seq) {
                 int nth = backend->get_thread_num();
-                backend->do_work_stealing_job(
+                Backend_NUMA::getInstance().do_work(
                     nth, nullptr,
                     [&](int task_id) {
                         int ith = task_id;
@@ -935,7 +935,7 @@ void KVCache::calculate_block_similarity_layer_(
                     },
                     nullptr);
             } else {
-                backend->do_work_stealing_job(
+                Backend_NUMA::getInstance().do_work(
                     block_num, nullptr,
                     [&](int task_id) {
                         int block_id = task_id + init_block_num;
@@ -963,7 +963,7 @@ void KVCache::calculate_block_similarity_layer_(
             }
         }
     } else {
-        backend->do_work_stealing_job(
+        Backend_NUMA::getInstance().do_work(
             batch_size * max_block_num, nullptr,
             [&](int task_id) {
                 int batch_id = task_id / max_block_num;
@@ -1196,7 +1196,7 @@ void KVCache::calculate_sparsity_layer_(const uint16_t *q_in_data,
     // Timer start
     auto start = std::chrono::high_resolution_clock::now();
     seq_len_ = config_.block_len;
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         batch_size * config_.kv_head_num * max_block_num,
         [&](int thread_id) {
             thread_cur_head_idx_[thread_id].first = -1;
@@ -1665,7 +1665,7 @@ void KVCache::calculate_sparsity_kvhead_(const uint16_t *q_in_data,
     // Timer start
     auto start = std::chrono::high_resolution_clock::now();
     seq_len_ = config_.block_len;
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         batch_size * config_.kv_head_num * max_block_num,
         [&](int thread_id) {
             thread_cur_head_idx_[thread_id].first = -1;
@@ -1999,7 +1999,7 @@ void KVCache::calculate_block_similarity_kvhead_(
     int local_block_num, int pick_block_num, Backend *backend) {
     // Timer start
     auto start = std::chrono::high_resolution_clock::now();
-    backend->do_work_stealing_job(
+    Backend_NUMA::getInstance().do_work(
         batch_size * max_block_num, nullptr,
         [&](int task_id) {
             int batch_id = task_id / max_block_num;
