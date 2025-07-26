@@ -34,4 +34,4 @@ THREADS_PER_NODE=2 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Dow
     --web True
 
 从主线最新代码（2025.7.26）更新的full-support-numa版本已经提交，测试deepseek r1 0528 q4_k_m通过，Qwen3-235B测试如有结果可以提交到这里。
-目前这个版本amx那部分的numa优化未经测试（没机器），可能出错
+目前这个版本amx那部分的numa优化未经测试（没机器），可能出错; 没有使用USE_BALANCE_SERVE=1编译测试过并发的情况，照道理应该没有问题，后面测试一下。
