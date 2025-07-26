@@ -1,8 +1,20 @@
 git clone https://github.com/guqiong96/ktransformers.git
+
 git checkout full-support-numa
+
 git submodule update --init --recursive --verbose
+
 export  USE_NUMA=1 
+
 sh install.sh
+
+npm config set registry https://mirrors.cloud.tencent.com/npm/ 
+
+cd ktransformers/website/
+
+npm install @vue/cli --verbose
+
+npm run build --verbose
 
 THREADS_PER_NODE=2 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Downloads/ktransformers/ktransformers/server/main.py \
     --gguf_path ~/Downloads/DeepSeek-R1-0528-GGUF  \
