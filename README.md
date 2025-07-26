@@ -32,7 +32,7 @@ THREADS_PER_NODE=2 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Dow
     --cache_q4 true \
     --temperature 0.6 \
     --top_p 0.95 \
-    --optimize_config_path ~/Downloads/ktransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat.yaml \
+    --optimize_config_path ~/Downloads/ktransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat-serve.yaml \
     --force_think \
     --use_cuda_graph \
     --host :: \
