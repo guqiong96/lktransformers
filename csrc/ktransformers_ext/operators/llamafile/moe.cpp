@@ -490,15 +490,15 @@ void MOE::forward_many(int qlen, int k, const uint64_t* expert_ids, const float*
 
 void MOE::forward(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, int* batch_size_tensor, Backend* backend) {
     qlen = batch_size_tensor[0];
-    // if (qlen < config_.group_min_len) {
+    if (qlen < config_.group_min_len) {
         for (int i = 0; i < qlen; i++) {
             forward_one(k, expert_ids + i * k, weights + i * k, (uint8_t*)input + i * config_.hidden_size * ggml_type_size(config_.hidden_type) / ggml_blck_size(config_.hidden_type), (uint8_t*)output + i * config_.hidden_size * ggml_type_size(config_.hidden_type) / ggml_blck_size(config_.hidden_type), backend);
         }
         return;
-    // }
-    // int forward_len = std::min(config_.group_max_len, qlen);
-    // forward_many(forward_len, k, expert_ids, weights, input, output, backend);
+    }
+    int forward_len = std::min(config_.group_max_len, qlen);
+    forward_many(forward_len, k, expert_ids, weights, input, output, backend);
 
-    // batch_size_tensor[0] -= forward_len;
-    // forward(qlen - forward_len, k, expert_ids + forward_len * k, weights + forward_len * k, (uint8_t*)input + forward_len * config_.hidden_size * ggml_type_size(config_.hidden_type) / ggml_blck_size(config_.hidden_type), (uint8_t*)output + forward_len * config_.hidden_size * ggml_type_size(config_.hidden_type) / ggml_blck_size(config_.hidden_type), batch_size_tensor, backend);
+    batch_size_tensor[0] -= forward_len;
+    forward(qlen - forward_len, k, expert_ids + forward_len * k, weights + forward_len * k, (uint8_t*)input + forward_len * config_.hidden_size * ggml_type_size(config_.hidden_type) / ggml_blck_size(config_.hidden_type), (uint8_t*)output + forward_len * config_.hidden_size * ggml_type_size(config_.hidden_type) / ggml_blck_size(config_.hidden_type), batch_size_tensor, backend);
 }
