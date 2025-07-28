@@ -1,6 +1,8 @@
 最新版ktransformers需要安装aio库，  sudo dnf install libaio-devel 或者 sudo apt-get install libaio-dev
 
 这个分支优化了numa内存使用，多个numa节点只用一份内存，32个节点上均衡，解码速度不下降，略有提升。
+运行命令没改变，增加一个环境变量THREADS_PER_NODE控制每个numa节点用几个线程计算，nsp4 8个节点设置THREADS_PER_NODE=8意味着64个计算线程，如果开了L3 Cache NUMA Domain 32个节点, 设置THREADS_PER_NODE=2也是64个计算线程。
+思路一句话，专家权重分片计算，加载、计算两个部分配套修改。
 
 git clone https://github.com/guqiong96/ktransformers.git
 
