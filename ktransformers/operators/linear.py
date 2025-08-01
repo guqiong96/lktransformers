@@ -18,6 +18,7 @@ if not torch.xpu.is_available():
     import KTransformersOps
     import vLLMMarlin
 from ktransformers.util.custom_loader import GGUFLoader, SafeTensorLoader
+from ktransformers.util.custom_gguf import  translate_name_to_gguf
 from ktransformers.util.utils import InferenceState
 if not torch.xpu.is_available():
     from ktransformers.ktransformers_ext.operators.custom_marlin.quantize.utils.marlin_utils import (
@@ -418,6 +419,232 @@ class KLinearFP8(KLinearBase):
 
 # TODO: merge two marlin class
 
+
+class VLinearMarlin16(KLinearBase):
+    marlin_q_w: torch.Tensor
+    marlin_s: torch.Tensor
+    g_idx: torch.Tensor
+    sort_indices: torch.Tensor
+    has_bias: bool
+    def __init__(
+        self,
+        key: str,
+        gguf_loader: GGUFLoader,
+        config: PretrainedConfig,
+        orig_module: nn.Module = None,
+        device: str = "cuda",
+        num_bits: int = 4,  # 4-bit/8-bit is supported
+        group_size: int = 64,  # -1, 32, 64, 128
+        act_order: bool = False,
+        is_k_full=True,
+        **kwargs,
+    ):
+        assert device.lower() != "cpu", "Marlin quantized linear only supports GPU device"
+        super().__init__(key, gguf_loader, config, orig_module, device, **kwargs)
+        self.num_bits = num_bits
+        self.group_size = group_size
+        self.act_order = act_order
+        self.is_k_full = is_k_full
+        self.padding = False
+        self.orin_in_features = self.in_features
+        self.orin_out_features = self.out_features
+        if self.in_features%GPTQ_MARLIN_MIN_THREAD_K!=0 or self.out_features%GPTQ_MARLIN_MIN_THREAD_K!=0:
+            #print(f"warning!, in_features={in_features} or out_features={out_features} is undivisible by GPTQ_MARLIN_MIN_THREAD_K={GPTQ_MARLIN_MIN_THREAD_K} and GPTQ_MARLIN_MIN_THREAD_N={GPTQ_MARLIN_MIN_THREAD_N}, padding")
+            self.padding = True
+            self.in_features = (self.in_features+GPTQ_MARLIN_MIN_THREAD_K-1)//GPTQ_MARLIN_MIN_THREAD_K*GPTQ_MARLIN_MIN_THREAD_K
+            self.out_features = (self.out_features+GPTQ_MARLIN_MIN_THREAD_N-1)//GPTQ_MARLIN_MIN_THREAD_N*GPTQ_MARLIN_MIN_THREAD_N
+            #print(f"After padding: in_features={in_features}, out_features={out_features}")
+        
+        self.k = self.in_features
+        self.n = self.out_features
+
+    def load(self, w: dict | nn.Parameter | tuple | None = None, device: str|None = None):
+        if self.loaded: 
+            return
+        
+        # 强制禁用act_order
+        self.act_order = False
+        
+        # 设备处理逻辑
+        target_device = torch.device(device) if device else self.device
+        gpu_device = torch.device("cuda:0") if torch.cuda.is_available() else target_device
+        
+        # 权重加载到CPU
+        if w is None: 
+            w = self.load_weight(device="cpu")
+        
+        # 权重解析
+        if isinstance(w, nn.Parameter):
+            weight = w.view(self.orin_out_features, self.orin_in_features).T
+            self.has_bias = False
+        elif isinstance(w, tuple):
+            w = list(w)
+            weight = w[0].view(self.orin_out_features, self.orin_in_features).T
+            self.bias = w[1].view(self.orin_out_features) if w[1] is not None else None
+            self.has_bias = True
+        else:
+            raise ValueError("Invalid weight type")
+        
+        # 确保在CPU上处理
+        weight = weight.cpu().float()
+        if self.has_bias and self.bias is not None:
+            self.bias = self.bias.cpu().float()
+        
+        # 应用padding
+        if self.padding:
+            padded_weight = torch.zeros(self.in_features, self.out_features, device="cpu")
+            padded_weight[:self.orin_in_features, :self.orin_out_features] = weight
+            weight = padded_weight
+        
+        # =====================================================================
+        # 分块量化核心逻辑（确保合并后与整体量化一致）
+        # =====================================================================
+        chunk_size = 1024  # 可调整的分块大小
+        num_chunks = (weight.shape[1] + chunk_size - 1) // chunk_size
+        marlin_q_w_chunks = []
+        marlin_s_chunks = []
+        
+        for i in range(num_chunks):
+            start_col = i * chunk_size
+            end_col = min((i + 1) * chunk_size, weight.shape[1])
+            weight_chunk = weight[:, start_col:end_col]
+            
+            # 仅将当前块移至GPU
+            weight_chunk = weight_chunk.to(gpu_device)
+            
+            # 量化当前块（强制act_order=False）
+            with torch.no_grad():
+                marlin_q_w, marlin_s, _, _, _ = marlin_quantize(
+                    weight_chunk, self.num_bits, self.group_size, False
+                )
+            
+            # 收集量化结果（保留在GPU）
+            marlin_q_w_chunks.append(marlin_q_w)
+            marlin_s_chunks.append(marlin_s)
+            
+            # 显存清理（防止OOM）
+            del weight_chunk, marlin_q_w, marlin_s
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        # =====================================================================
+        # 关键合并逻辑（确保与整体量化一致）
+        # =====================================================================
+        # 1. 量化权重合并：沿列拼接
+        self.marlin_q_w = torch.cat(marlin_q_w_chunks, dim=1)
+        
+        # 2. scales合并：特殊处理分组尺寸
+        if self.group_size > 0 and self.group_size < weight.shape[0]:
+            # 分组量化情况：每个分组有独立scale值
+            num_groups = (weight.shape[0] + self.group_size - 1) // self.group_size
+            scale_blocks = []
+            
+            for s in marlin_s_chunks:
+                # 将scale重塑为[group_count, N]
+                s = s.view(num_groups, -1)
+                scale_blocks.append(s)
+            
+            # 沿列拼接scale块
+            self.marlin_s = torch.cat(scale_blocks, dim=1)
+        else:
+            # 完整层量化：简单拼接
+            self.marlin_s = torch.cat(marlin_s_chunks, dim=1)
+        
+        # act_order=False时始终为空
+        self.g_idx = torch.empty(0, dtype=torch.int32, device=target_device)
+        self.sort_indices = torch.empty(0, dtype=torch.int32, device=target_device)
+        
+        # =====================================================================
+        # 最终设置（确保结果一致性）
+        # =====================================================================
+        self.weight = self.marlin_q_w
+        self.workspace = MarlinWorkspace(
+            self.out_features, GPTQ_MARLIN_MIN_THREAD_N, GPTQ_MARLIN_MAX_PARALLEL, target_device
+        )
+        
+        # 保持原始维度信息（非padded尺寸）
+        self.k = self.orin_in_features
+        self.n = self.orin_out_features
+        
+        # 移动最终结果到目标设备
+        self.weight = self.weight.to(target_device)
+        self.marlin_s = self.marlin_s.to(target_device)
+        if self.has_bias and self.bias is not None:
+            self.bias = self.bias.to(target_device)
+        
+        self.loaded = True
+
+    def forward(self, x: torch.Tensor, bsz_tensor: torch.Tensor = None) -> torch.Tensor:
+        if bsz_tensor is None:
+            bsz_tensor = torch.tensor([x.shape[0]], dtype=torch.int32, device=self.device)
+
+
+        # Only support input x as BF16 and FP16
+        x = x.to(self.device)
+        orig_shape = list(x.shape)
+        orig_dtype = x.dtype
+        x = x.reshape(-1, orig_shape[-1])
+        marlin_s = self.marlin_s.to(x.dtype)
+        sms = -1
+
+        # padding x.shape[0] to avoid CUDA illegal memory access error
+        x, orig_size_m = self._pad_input(x)
+
+        x = vLLMMarlin.gptq_marlin_gemm(
+            x,
+            self.marlin_q_w,
+            marlin_s,
+            self.g_idx,
+            self.sort_indices,
+            self.workspace.scratch,
+            self.num_bits,
+            bsz_tensor,
+            x.shape[0],
+            self.n,
+            x.shape[-1],
+            sms,
+            self.is_k_full,
+        )
+
+        x = x[:orig_size_m]
+
+        if self.has_bias:
+            x = x + self.bias
+        orig_shape[-1] = self.n
+        return x.reshape(orig_shape).to(orig_dtype)
+
+    def unload(self):
+
+        if self.has_bias:
+            self.bias = None
+        self.marlin_q_w = None
+        self.marlin_s = None
+        self.g_idx = None
+        self.sort_indices = None
+        self.workspace = None  
+
+    def _pad_input(self, x):
+
+        size_m = x.shape[0]
+        size_k = x.shape[1]
+
+        # size_m and align value depends on VLinearMarlin implementation
+        if size_m > 1024:
+            align = 1024
+        elif size_m > 64:
+            align = 64
+        else:
+            align = 1
+
+        padded_size_m = ((size_m + align - 1) // align) * align
+
+        if padded_size_m > size_m:
+            pad_len = padded_size_m - size_m
+            pad_tensor = torch.zeros((pad_len, size_k), dtype=x.dtype, device=x.device)
+            x = torch.cat([x, pad_tensor], dim = 0).contiguous()
+        return x, size_m
+
+
 class VLinearMarlin(KLinearBase):
     marlin_q_w: torch.Tensor
     marlin_s: torch.Tensor
@@ -789,14 +1016,15 @@ class KLinearCPUInfer(KLinearBase):
         del weight
 
     def load_weights(self, w: dict | nn.Parameter | tuple | None = None, device: str = "cpu"):
+        key = translate_name_to_gguf(self.key + ".weight")
         if self.gguf_loader.has_tensor(self.key + ".weight"):
             if self.key + ".bias" in self.gguf_loader.tensor_file_map:
                 weight = self.gguf_loader.get_tensor_bytes(self.key + ".weight")
-                self.weight_type = self.gguf_loader.tensor_info[self.key + ".weight"]["ggml_type"]
+                self.weight_type = self.gguf_loader.tensor_info[key]["ggml_type"]
                 self.bias = self.gguf_loader.load_gguf_tensor(self.key + ".bias", device=device)
             else:
                 weight = self.gguf_loader.get_tensor_bytes(self.key + ".weight")
-                self.weight_type = self.gguf_loader.tensor_info[self.key + ".weight"]["ggml_type"]
+                self.weight_type = self.gguf_loader.tensor_info[key]["ggml_type"]
                 self.bias = None
             return weight
         else:
@@ -882,6 +1110,7 @@ LINEAR_MAP = {
     "KLinearTorch": KLinearTorch,
     "KLinearCPUInfer": KLinearCPUInfer,
     "VLinearMarlin": VLinearMarlin,
+    "VLinearMarlin16": VLinearMarlin16,
     "KLinearFP8": KLinearFP8,
     "KLinearQ8": KLinearQ8,
     "KLinearIPEXLLM": KLinearIPEXLLM,
@@ -933,12 +1162,12 @@ class KTransformersLinear(BaseInjectedModule, KLinearBase):
             self.generate_linear.unload()
             self.prefill_linear.load(w=w)
             self.device = self.prefill_linear.device
-            self.weight = self.prefill_linear.weight # modeling_xxx.py may use linear.weight
+            # self.weight = self.prefill_linear.weight # modeling_xxx.py may use linear.weight
         elif mode == InferenceState.GENERATE:
             self.prefill_linear.unload()
             self.generate_linear.load(w=w)
             self.device = self.generate_linear.device
-            self.weight = self.generate_linear.weight # modeling_xxx.py may use linear.weight
+            # self.weight = self.generate_linear.weight # modeling_xxx.py may use linear.weight
         elif mode == InferenceState.UNLOAD:
             self.prefill_linear.unload()
             self.generate_linear.unload()
