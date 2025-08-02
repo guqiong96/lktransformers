@@ -571,7 +571,7 @@ class VLinearMarlin16(KLinearBase):
         self.marlin_s = self.marlin_s.to(target_device).contiguous()
         
         if self.has_bias and self.bias is not None:
-            self.bias = self.bias.to(target_device)
+            self.bias = self.bias.to(target_device).contiguous()
         
         self.loaded = True
 

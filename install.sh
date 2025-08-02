@@ -5,7 +5,7 @@ set -e
 DEV="cuda"
 
 # parse --dev argument
-while [[ "$#" -gt 0 ]]; do
+while ["$#" -gt 0 ]; do
     case $1 in
         --dev) DEV="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
@@ -35,7 +35,7 @@ pip install -r ktransformers/server/requirements.txt
 echo "Installing ktransformers"
 KTRANSFORMERS_FORCE_BUILD=TRUE pip install -v . --no-build-isolation
 
-if [[ "$DEV_BACKEND" == "cuda" ]]; then
+if ["$DEV_BACKEND" == "cuda" ]; then
     echo "Installing custom_flashinfer for CUDA backend"
     pip install third_party/custom_flashinfer/
 fi

@@ -1,4 +1,6 @@
 # KTransformers - 开启NUMA内存占用不翻倍
+[2025-08-02 修复sh install.sh在shell为dash时的兼容posix问题，导致未能安装自带flashinfer,出现的一些莫名问题
+RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True后报错等]
 [2025-08-01 解决 16G 显卡加载 Kimi K2 的显存峰值问题]
 [2025-07-25 开启NUMA内存占用不翻倍]
 
@@ -18,7 +20,7 @@
 
 1. 支持 AMX 的 CPU 使用 amx 配置文件会报错（AMX 后台NUMA改造未完成）
 2. Prefill 性能下降（优化进行中）
-3. 50 系显卡可能报错 `RuntimeError: pidfd_getfd: Operation not permitted`
+3. 报错 `RuntimeError: pidfd_getfd: Operation not permitted`可以去掉PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True 运行，速度变慢，提交问题到这里
 4. Intel 至强平台，或者开启超线程运行速度慢（优化进行中）
 
 ## 🚀 快速开始
