@@ -1,7 +1,9 @@
 # LKTransformers - 开启NUMA内存占用不翻倍
 [2025-08-02 修复sh install.sh在shell为dash时的兼容posix问题，导致未能安装自带flashinfer,出现的一些莫名问题
 RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True后报错等]
+
 [2025-08-01 解决 16G 显卡加载 Kimi K2 的显存峰值问题]
+
 [2025-07-25 开启NUMA内存占用不翻倍]
 
 本分支提供 NUMA 优化的稳定版本，包含内存/显存优化和一些问题修复。
