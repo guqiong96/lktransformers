@@ -1,28 +1,29 @@
-2025.8.1  16G显卡运行Kimi K2加载阶段不会突破峰值显存!!!
-2025.7.25 开启多个NUMA节点不会占用双倍内存!!!
+# KTransformers - 开启NUMA内存占用不翻倍
+[2025-08-01 解决 16G 显卡加载 Kimi K2 的显存峰值问题]
+[2025-07-25 开启NUMA内存占用不翻倍]
 
-通过测试的模型：
-KVCache-ai/Kimi-K2-Instruct-GGUF 
-deepseek-ai/DeepSeek-R1-0528 
-unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF
+本分支提供 NUMA 优化的稳定版本，包含内存/显存优化和一些问题修复。
 
-已知问题：
-1、带AMX支持的cpu使用带amx的yaml配置文件运行会出错，amx后台还没改好
-2、prefill性能下降，优化未完成
-3、50系显卡可能出现 RuntimeError: pidfd_getfd: Operation not permitted  原因未知
-4、在 Intel 至强平台上运行慢， 原因未知
+## ✨ 核心特性
 
+- **NUMA 内存优化**：多个 NUMA 节点共享单份内存，32节点负载均衡，解码速度不降略有提升
+- **线程精细控制**：通过 `THREADS_PER_NODE` 环境变量管理每个节点的计算线程数
+- **显存优化**：新增 `VLinearMarlin16` 支持，解决 16G 显卡加载 Kimi K2 的显存峰值问题
+- **已验证模型**：
+  - `KVCache-ai/Kimi-K2-Instruct-GGUF`
+  - `deepseek-ai/DeepSeek-R1-0528`
+  - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF`
 
-基本介绍：
+## ⚠️ 已知问题
 
-一、这个分支提供一个NUMA优化的稳定版本，以及部分BUG处理和一些内存、显存优化支持，根据情况与合并主线新特性。
+1. 支持 AMX 的 CPU 使用 amx 配置文件会报错（AMX 后台NUMA改造未完成）
+2. Prefill 性能下降（优化进行中）
+3. 50 系显卡可能报错 `RuntimeError: pidfd_getfd: Operation not permitted`
+4. Intel 至强平台，或者开启超线程运行速度慢（优化进行中）
 
-二、优化了numa内存使用，多个numa节点只用一份内存，32个节点上均衡，解码速度不下降，略有提升。
-增加一个环境变量THREADS_PER_NODE控制每个numa节点用几个线程计算，nsp4 8个节点设置THREADS_PER_NODE=8意味着64个计算线程，如果开了L3 Cache NUMA Domain 32个节点, 设置THREADS_PER_NODE=2也是64个计算线程。
+## 🚀 快速开始
 
-三、增加一个VLinearMarlin16，16显卡运行Kimi K2遇到启动爆显存时可以在yaml中配置使用
-
-!!!更多安装类问题参考主线，没有改变!!!
+### 安装步骤
 
 git clone https://github.com/guqiong96/ktransformers.git
 
@@ -32,18 +33,18 @@ git submodule update --init --recursive --verbose
 
 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
 
-
-THREADS_PER_NODE=8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Downloads/ktransformers/ktransformers/server/main.py \
-    --gguf_path ~/Downloads/DeepSeek-R1-0528-GGUF  \
-    --model_path ~/Models/DeepSeek-R1-0528 \
-    --model_name DeepSeek-R1  \
+### 运行示例
+THREADS_PER_NODE=8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Downloads/KTransformers/ktransformers/server/main.py \
+    --gguf_path ~/Models/Kimi-K2-Instruct-GGUF  \
+    --model_path ~/Models/Kimi-K2-Instruct \
+    --model_name Kimi-K2  \
     --cpu_infer 28 \
     --max_new_tokens 16384 \
     --cache_lens 16384 \
     --cache_q4 true \
     --temperature 0.6 \
     --top_p 0.95 \
-    --optimize_config_path ~/Downloads/ktransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat-serve.yaml \
+    --optimize_config_path ~/Downloads/KTransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat-serve.yaml \
     --force_think \
     --use_cuda_graph \
     --host :: \
@@ -51,3 +52,17 @@ THREADS_PER_NODE=8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Dow
     --max_batch_size 4 \
     --backend_type balance_serve
 
+## 🔧 配置技巧
+
+- **NUMA 线程配置**：
+  - 8节点 × 8线程 = 64计算线程
+  - 32节点 × 2线程 = 64计算线程
+- **显存优化**：在 YAML 配置中使用 `VLinearMarlin16` 防止 16G 显卡显存溢出
+
+## 📌 注意事项
+
+1. 更新后出现疑难问题，运行 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
+2. 更多安装问题请参考主线文档
+3. 定期合并主线获取最新特性
+
+ 

@@ -567,8 +567,9 @@ class VLinearMarlin16(KLinearBase):
         self.n = self.orin_out_features
         
         # 移动最终结果到目标设备
-        self.weight = self.weight.to(target_device)
-        self.marlin_s = self.marlin_s.to(target_device)
+        self.weight = self.weight.to(target_device).contiguous()
+        self.marlin_s = self.marlin_s.to(target_device).contiguous()
+        
         if self.has_bias and self.bias is not None:
             self.bias = self.bias.to(target_device)
         
