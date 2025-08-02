@@ -70,6 +70,5 @@ THREADS_PER_NODE=8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Dow
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
-
-
+![Weixin Image_2025-08-02_183944_421](https://github.com/user-attachments/assets/8f227407-2e0c-48b1-a677-ff0545b5b7a8)
  
