@@ -109,14 +109,14 @@ class MOE {
     size_t down_blk_size;
     size_t down_bytes;
 
-    std::vector<float*> input_fp32_numa_;        //[numa_nodes, group_max_len * hidden_size]
-    std::vector<uint8_t*> gate_input_numa_;      //[numa_nodes, group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
-    std::vector<uint8_t*> up_input_numa_;        //[numa_nodes, group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-    std::vector<float*> gate_output_numa_;       //[numa_nodes, group_max_len * routed_expert_num * intermediate_size]
-    std::vector<float*> up_output_numa_;         //[numa_nodes, group_max_len * routed_expert_num * intermediate_size]
-    std::vector<uint8_t*> down_input_numa_;      //[numa_nodes, group_max_len * routed_expert_num * intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
-    std::vector<float*> down_output_numa_;       //[numa_nodes, group_max_len * routed_expert_num * hidden_size]
-    std::vector<float*> output_fp32_numa_;       //[numa_nodes, group_max_len * hidden_size]
+    float* input_fp32_;        //[ group_max_len * hidden_size]
+    uint8_t* gate_input_;      //[ group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
+    uint8_t* up_input_;        //[ group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
+    float* gate_output_;       //[ group_max_len * routed_expert_num * intermediate_size]
+    float* up_output_;         //[ group_max_len * routed_expert_num * intermediate_size]
+    uint8_t* down_input_;      //[ group_max_len * routed_expert_num * intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
+    float* down_output_;       //[ group_max_len * routed_expert_num * hidden_size]
+    float* output_fp32_;       //[ group_max_len * hidden_size]
  
 };
 

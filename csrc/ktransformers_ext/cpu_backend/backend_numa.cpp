@@ -244,27 +244,10 @@ void Backend_NUMA::process_tasks(int cpu_id) {
         }
         compute_func_(task_id);
     } 
-    int begin = numa_node_ * core_per_node_;
-    int end =  begin + core_per_node_;
-    for (int i = begin; i < end; i++) { 
-        if (i == cpu_id) continue;
-        if (thread_state_[cpu_id]->status.load(std::memory_order_acquire) !=
-            ThreadStatus::WORKING) {
-            continue;
-        } 
-        while (true) {
-            int task_id = thread_state_[cpu_id]->curr.fetch_add(
-                1, std::memory_order_acq_rel);
-            if (task_id >= thread_state_[cpu_id]->end) {
-                break;
-            }
-            compute_func_(task_id);
-        } 
-    } 
 
     if(num_cpus_ > num_cores_){
-        begin = numa_node_ * core_per_node_ + num_cores_;
-        end =  begin + core_per_node_;
+        int begin = numa_node_ * core_per_node_ + num_cores_;
+        int end =  begin + core_per_node_;
         for (int i = begin; i < end; i++) { 
             if (i == cpu_id) continue;
             if (thread_state_[cpu_id]->status.load(std::memory_order_acquire) !=
@@ -281,6 +264,24 @@ void Backend_NUMA::process_tasks(int cpu_id) {
             } 
         } 
     }
+
+    int begin = numa_node_ * core_per_node_;
+    int end =  begin + core_per_node_;
+    for (int i = begin; i < end; i++) { 
+        if (i == cpu_id) continue;
+        if (thread_state_[cpu_id]->status.load(std::memory_order_acquire) !=
+            ThreadStatus::WORKING) {
+            continue;
+        } 
+        while (true) {
+            int task_id = thread_state_[cpu_id]->curr.fetch_add(
+                1, std::memory_order_acq_rel);
+            if (task_id >= thread_state_[cpu_id]->end) {
+                break;
+            }
+            compute_func_(task_id);
+        } 
+    }  
  
 
     if (finalize_func_ != nullptr) {
