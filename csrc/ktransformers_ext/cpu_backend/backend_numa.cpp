@@ -9,12 +9,60 @@
  **/
 
 #include "backend_numa.h"
-
+#include <fstream>
+#include <unordered_set>
 
 
 thread_local int Backend_NUMA::numa_node_ = -1;
 thread_local int Backend_NUMA::thread_local_id_ = -1;
- 
+
+struct CpuInfo {
+    int cpuid_id;
+    int core_id;
+    int physical_package_id;
+    bool is_logic_core;
+};
+
+int read_topology(const std::string& cpu_path, const char* file) {
+    std::ifstream ifs(cpu_path + "/" + file);
+    int value;
+    return ifs >> value ? value : -1;
+}
+
+
+std::vector<CpuInfo> get_cpu_info(int & num_cores_) { 
+    std::vector<CpuInfo> result;
+    const int total_cpus = numa_num_configured_cpus();
+    std::unordered_set<int> seen_cores;
+    
+    int max_package_id = 0;
+    for (int i = 0; i < total_cpus; ++i) {
+        CpuInfo info{};
+        info.cpuid_id = i;
+        
+        const std::string cpu_dir = "/sys/devices/system/cpu/cpu" + std::to_string(i);
+        
+        int x = read_topology(cpu_dir, "topology/core_id");
+        info.physical_package_id = read_topology(cpu_dir, "topology/physical_package_id");
+
+        info.is_logic_core = !seen_cores.insert(x).second;
+
+        if(!info.is_logic_core){
+            num_cores_++;
+            info.core_id = i;
+        }else{
+            info.core_id = i - total_cpus/2;
+        }
+
+        result.push_back(info);
+
+        if(info.physical_package_id > max_package_id){
+            max_package_id = info.physical_package_id;
+        }
+    } 
+    num_cores_ = num_cores_ * (max_package_id+1);
+    return result;
+}
 
 Backend_NUMA::Backend_NUMA(int threads_per_node) {
     const char* env_threads = std::getenv("THREADS_PER_NODE");
@@ -33,20 +81,37 @@ Backend_NUMA::Backend_NUMA(int threads_per_node) {
                       << threads_per_node << std::endl;
         }
     }
-    threads_per_node_ = threads_per_node; 
- 
+   
     num_cpus_ = numa_num_configured_cpus(); 
-    cpus_per_node_ = num_cpus_ / numa_nodes_;
-    num_threads_ = numa_nodes_ * threads_per_node_;
- 
+    num_cores_ = 0; 
+    std::vector<CpuInfo> cpu_info = get_cpu_info(num_cores_);
+    thread_per_node_ = std::min(threads_per_node, num_cpus_/numa_nodes_); 
+    num_threads_ = numa_nodes_ * thread_per_node_;
+     
+    cpu_per_node_ = num_cpus_ / numa_nodes_;
+    core_per_node_ = num_cores_ / numa_nodes_;
+    
     thread_to_cpu_id.resize(num_threads_, -1);
     cpu_to_thread_id.resize(num_cpus_, -1);
-    for(int i=0; i< num_threads_; i++){
-        int physical_core = (i / threads_per_node_) * cpus_per_node_ + (i % threads_per_node_) * cpus_per_node_/ threads_per_node_; 
-        thread_to_cpu_id[i] = physical_core;
-        cpu_to_thread_id[physical_core] = i;
-         std::cout << "Backend_NUMA init, thread_id: " << i << " cpu_id:" << physical_core << std::endl;
 
+    bool hyper_threading = num_cpus_ > num_cores_;
+    for(int i=0; i< num_threads_; i++){
+        int cpu_id = -1;
+        int node_id = i / thread_per_node_;
+        int offset = i % thread_per_node_;
+        if(!hyper_threading){
+            cpu_id = node_id * cpu_per_node_ + offset * cpu_per_node_ / thread_per_node_; 
+        }else{ 
+            cpu_id = node_id * core_per_node_ + offset % core_per_node_;
+            if(offset >= core_per_node_){
+                cpu_id = cpu_id + num_cpus_/2;
+                assert(cpu_info[cpu_id].is_logic_core);
+            }
+            
+        }
+        thread_to_cpu_id[i] = cpu_id;
+        cpu_to_thread_id[cpu_id] = i;
+        std::cout << "Backend_NUMA init, thread_id: " << i << " cpu_id:" << cpu_id << " core_id:" << cpu_info[cpu_id].core_id << std::endl;
     }
     thread_state_.resize(num_cpus_);
     for (int i = 0; i < num_cpus_; i++) {
@@ -61,7 +126,10 @@ Backend_NUMA::Backend_NUMA(int threads_per_node) {
     for (int i = 0; i < num_cpus_; i++) {
         workers_[i] = std::thread(&Backend_NUMA::worker_thread, this, i);
     }
-    std::cout << "Backend_NUMA init suscess, numa nodes: " << numa_nodes_ << " cpus:" << num_cpus_ << " threads: " << num_threads_ << std::endl;
+    std::cout << "Backend_NUMA init suscess, numa nodes: " << numa_nodes_ << " cors:" << num_cores_ << " cpus:" << num_cpus_ << " threads: " << num_threads_ << std::endl;
+    if(hyper_threading){
+        std::cout << "hyper_threading is using . "  << std::endl;
+    }
 }
 
 Backend_NUMA::~Backend_NUMA() {
@@ -91,87 +159,8 @@ Backend_NUMA::~Backend_NUMA() {
 int Backend_NUMA::get_num_threads(){
     return num_threads_;
 }
-void Backend_NUMA::do_work_stealing_job(int expert_num, int block_num,
-                                   std::function<void(int)> init_func,
-                                   std::function<void(int)> compute_func,
-                                   std::function<void(int)> finalize_func) {
-    init_func_ = init_func;
-    compute_func_ = compute_func;
-    finalize_func_ = finalize_func;
- 
-    int task_num = expert_num * block_num;
-    int tasks_per_node  = task_num / numa_nodes_ ;
-    assert(expert_num % numa_nodes_ == 0);
-    int base = tasks_per_node  / threads_per_node_;
-    int remain = tasks_per_node % threads_per_node_;
- 
-    int begin = 0;
-    int end = 0;                              
-    for (int i = 0; i < num_threads_; i++) {
-        int local_id = i % threads_per_node_;
-        begin = end;
-        int cpu_id = thread_to_cpu_id[i];
-        thread_state_[cpu_id]->curr.store(begin, std::memory_order_relaxed);
-        if(i % threads_per_node_ == 0)
-            end = begin + base + (local_id < remain);
-        else
-            end = begin + base;
-        thread_state_[cpu_id]->end = end;
-        if(end > begin){
-            thread_state_[cpu_id]->status.store(ThreadStatus::WORKING, std::memory_order_release);
-        }else{
-            break;
-        }
-        if(begin >= end) break;
-    }
-     
-    
-    for (int i = 0; i < num_threads_; i++) {
-        while (thread_state_[thread_to_cpu_id[i]]->status.load(std::memory_order_acquire) ==
-               ThreadStatus::WORKING) {
-        }
-    }
-}
 
-
-void Backend_NUMA::do_work_on_all_node(int qlen, std::function<void(int)> init_func,
-                                   std::function<void(int)> compute_func,
-                                   std::function<void(int)> finalize_func) {               
- 
-    init_func_ = init_func;
-    compute_func_ = compute_func;
-    finalize_func_ = finalize_func;
- 
-    int base = qlen / threads_per_node_;
-    int remain = qlen % threads_per_node_;
-
-    for(int i=0; i< numa_nodes_; i++){
-        int begin = 0;
-        int end = 0;
-        int node_base = i*threads_per_node_;
-        for(int j = 0; j< threads_per_node_; j++){
-            int thread_id = node_base + j;
-            int cpu_id = thread_to_cpu_id[i];
-            begin = end;
-            end = begin + base + (j < remain);
-            thread_state_[cpu_id]->curr.store(begin, std::memory_order_relaxed);
-            thread_state_[cpu_id]->end = end;
-            if(end > begin){
-                thread_state_[cpu_id]->status.store(ThreadStatus::WORKING, std::memory_order_release);
-            }else{
-                break;
-            }
-        }
-        if(begin >= end) break;
-    }  
-  
-    for (int i = 0; i < num_threads_; i++) {
-        while (thread_state_[thread_to_cpu_id[i]]->status.load(std::memory_order_acquire) == ThreadStatus::WORKING) {
-        }
-    }  
-}
-
-void Backend_NUMA::do_work(int qlen, std::function<void(int)> init_func,
+void Backend_NUMA::do_work(int m, std::function<void(int)> init_func,
                                    std::function<void(int)> compute_func,
                                    std::function<void(int)> finalize_func) {
  
@@ -179,23 +168,18 @@ void Backend_NUMA::do_work(int qlen, std::function<void(int)> init_func,
     compute_func_ = compute_func;
     finalize_func_ = finalize_func; 
  
-    int task_num = qlen;
-    int base = task_num / threads_per_node_;
-    int remain = task_num % threads_per_node_; 
+    int base = m / thread_per_node_;
+    int remain = m % thread_per_node_; 
     int begin = 0;
     int end = 0;     
-    for (int i = 0; i < threads_per_node_; i++) {
+    for (int i = 0; i < thread_per_node_; i++) {
         begin = end;
         end = begin + base + (i < remain);
-        int cpu_id = thread_to_cpu_id[i];
-        thread_state_[cpu_id]->curr.store(begin, std::memory_order_relaxed);
-        thread_state_[cpu_id]->end = end;
-        if(end > begin){
-            thread_state_[cpu_id]->status.store(ThreadStatus::WORKING, std::memory_order_release);
-        }else{
-            break;
-        }
         if(begin >= end) break;
+        int cpu_id = thread_to_cpu_id[i];
+        thread_state_[cpu_id]->end = end; 
+        thread_state_[cpu_id]->curr.store(begin, std::memory_order_relaxed);
+        thread_state_[cpu_id]->status.store(ThreadStatus::WORKING, std::memory_order_release);
     } 
 
     for (int i = 0; i < num_threads_; i++) {
@@ -222,14 +206,15 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
     for(int i=0; i< numa_nodes_; i++){
         int local_nth = (n_base + (i < n_remain));   
         int num_node_tasks = local_nth *  k;
-        if(num_node_tasks == 0) continue; 
+        if(num_node_tasks == 0) break; 
    
-        int base = num_node_tasks / threads_per_node_;
-        int remain = num_node_tasks % threads_per_node_;
-        int node_base = i*threads_per_node_;
-        for(int j=0; j< threads_per_node_; j++){
+        int base = num_node_tasks / thread_per_node_;
+        int remain = num_node_tasks % thread_per_node_;
+        int node_base = i*thread_per_node_;
+        for(int j=0; j< thread_per_node_; j++){
             begin = end;
             end = begin + base + (j < remain);
+            if(begin >= end) break;
             int cpu_id = thread_to_cpu_id[node_base+j];
             thread_state_[cpu_id]->curr.store(begin, std::memory_order_relaxed);
             thread_state_[cpu_id]->end = end;
@@ -242,7 +227,7 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
         }
     }
 }
-
+  
 
 void Backend_NUMA::process_tasks(int cpu_id) {
 
@@ -258,10 +243,9 @@ void Backend_NUMA::process_tasks(int cpu_id) {
             break;
         }
         compute_func_(task_id);
-    }
-
-    int begin = numa_node_ * cpus_per_node_;
-    int end =  begin + cpus_per_node_;
+    } 
+    int begin = numa_node_ * core_per_node_;
+    int end =  begin + core_per_node_;
     for (int i = begin; i < end; i++) { 
         if (i == cpu_id) continue;
         if (thread_state_[cpu_id]->status.load(std::memory_order_acquire) !=
@@ -276,7 +260,28 @@ void Backend_NUMA::process_tasks(int cpu_id) {
             }
             compute_func_(task_id);
         } 
+    } 
+
+    if(num_cpus_ > num_cores_){
+        int begin = numa_node_ * core_per_node_ + num_cpus_/2;
+        int end =  begin + core_per_node_ + num_cpus_/2;
+        for (int i = begin; i < end; i++) { 
+            if (i == cpu_id) continue;
+            if (thread_state_[cpu_id]->status.load(std::memory_order_acquire) !=
+                ThreadStatus::WORKING) {
+                continue;
+            } 
+            while (true) {
+                int task_id = thread_state_[cpu_id]->curr.fetch_add(
+                    1, std::memory_order_acq_rel);
+                if (task_id >= thread_state_[cpu_id]->end) {
+                    break;
+                }
+                compute_func_(task_id);
+            } 
+        } 
     }
+ 
 
     if (finalize_func_ != nullptr) {
         finalize_func_(thread_id);
@@ -289,7 +294,11 @@ void Backend_NUMA::worker_thread(int cpu_id) {
     auto start = std::chrono::steady_clock::now(); 
     #ifdef USE_NUMA
     if (numa_node_ == -1) { 
-        numa_node_ = cpu_id / cpus_per_node_;  
+        if(cpu_id > num_cores_){
+            numa_node_ = (cpu_id - num_cpus_ /2) / cpu_per_node_; 
+        }else{
+            numa_node_ = cpu_id / cpu_per_node_; 
+        } 
         bind_to_cpu(cpu_id); 
         set_numa_mempolicy(numa_node_);
     }
@@ -370,8 +379,7 @@ void* allocate_aligned_numa(size_t size, int node) {
     size_t total_size = size + alignment - 1;
     void* raw_ptr = numa_alloc_onnode(total_size, node);
     if (!raw_ptr) return nullptr;
-    
-    // 计算对齐地址
+     
     uintptr_t addr = reinterpret_cast<uintptr_t>(raw_ptr);
     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
     return reinterpret_cast<void*>(aligned_addr);
@@ -384,10 +392,19 @@ void free_aligned_numa(void* aligned_ptr, size_t size) {
 }
 
 void* allocate_aligned(size_t size) { 
-   return malloc(size); 
+   size_t alignment = 64;
+    size_t total_size = size + alignment - 1;
+    void* raw_ptr = malloc(total_size);
+    if (!raw_ptr) return nullptr;
+     
+    uintptr_t addr = reinterpret_cast<uintptr_t>(raw_ptr);
+    uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
+    return reinterpret_cast<void*>(aligned_addr);
 }
  
 void free_aligned(void* aligned_ptr, size_t size) {
-    free(aligned_ptr);
+    uintptr_t addr = reinterpret_cast<uintptr_t>(aligned_ptr);
+    void* raw_ptr = reinterpret_cast<void*>(addr & ~(63));
+    free(raw_ptr);
 }
 

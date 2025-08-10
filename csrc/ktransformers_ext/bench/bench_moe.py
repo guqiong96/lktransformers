@@ -9,20 +9,21 @@ LastEditors  : chenht2022
 LastEditTime : 2024-08-06 10:41:28
 Copyright (c) 2024 by KVCache.AI, All Rights Reserved. 
 '''
+import torch
 import os, sys
 import time
 sys.path.append(os.path.dirname(__file__) + '/../build')
 import cpuinfer_ext
-import torch
 
-expert_num = 160
+
+expert_num = 32
 hidden_size = 5120
 intermediate_size = 1536
 stride = 16
 group_min_len = 10
 group_max_len = 1024
 n_routed_experts = 6
-layer_num = 10
+layer_num = 2
 qlen = 1
 CPUInfer = cpuinfer_ext.CPUInfer(64)
 warm_up_iter = 1000
@@ -108,7 +109,7 @@ def bench_moe(quant_mode: str):
         weights = torch.rand((layer_num, qlen, n_routed_experts), dtype=torch.float32, device = "cuda").to("cpu").contiguous()
         input = torch.randn((layer_num, qlen, hidden_size), dtype=torch.bfloat16, device = "cuda").to("cpu").contiguous()
         output = torch.empty((layer_num, qlen, hidden_size), dtype=torch.bfloat16, device = "cuda").to("cpu").contiguous()
-
+        batch_size_tensor = torch.tensor(45)
         # warm up
         for i in range(warm_up_iter):
             CPUInfer.submit(
@@ -118,7 +119,8 @@ def bench_moe(quant_mode: str):
                     expert_ids[i % layer_num].data_ptr(), 
                     weights[i % layer_num].data_ptr(),
                     input[i % layer_num].data_ptr(), 
-                    output[i % layer_num].data_ptr()
+                    output[i % layer_num].data_ptr(),
+                    batch_size_tensor.data_ptr()
                 )
             )
             CPUInfer.sync()
@@ -133,7 +135,8 @@ def bench_moe(quant_mode: str):
                     expert_ids[i % layer_num].data_ptr(), 
                     weights[i % layer_num].data_ptr(),
                     input[i % layer_num].data_ptr(), 
-                    output[i % layer_num].data_ptr()
+                    output[i % layer_num].data_ptr(),
+                    batch_size_tensor.data_ptr()
                 )
             )
             CPUInfer.sync()

@@ -49,29 +49,21 @@ struct A_ThreadState {
 };
 
 class Backend_NUMA {
-public:
-    // 删除拷贝构造函数和赋值操作符
+public: 
     Backend_NUMA(const Backend_NUMA&) = delete;
     Backend_NUMA& operator=(const Backend_NUMA&) = delete;
-
-    // 单例访问方法
+ 
     static Backend_NUMA& getInstance() {
         static Backend_NUMA instance;
         return instance;
     }
     int get_num_threads();
-    void do_work_stealing_job(int, int, std::function<void(int)>,
-                              std::function<void(int)>,
-                              std::function<void(int)>);
-
+     
     void do_k_work_stealing_job(int, int,
                                    std::function<void(int)>,
                                    std::function<void(int)>,
                                    std::function<void(int)>);
-    
-    void do_work_on_all_node(int, std::function<void(int)>,
-                              std::function<void(int)>,
-                              std::function<void(int)>);
+     
 
     void do_work(int, std::function<void(int)>,
                               std::function<void(int)>,
@@ -87,8 +79,10 @@ private:
     ~Backend_NUMA();
     int num_threads_; 
     int num_cpus_;
-    int cpus_per_node_;
-    int threads_per_node_;
+    int num_cores_;
+    int cpu_per_node_;
+    int thread_per_node_;
+    int core_per_node_;
     std::vector<int> thread_to_cpu_id;
     std::vector<int> cpu_to_thread_id;
     std::vector<A_ThreadState *> thread_state_; // [thread_num]

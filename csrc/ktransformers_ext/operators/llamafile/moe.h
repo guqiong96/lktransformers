@@ -61,8 +61,7 @@ class MOE {
     void* gate_proj_;  // [expert_num * intermediate_size * hidden_size ( /32 if quantized)]
     void* up_proj_;    // [expert_num * intermediate_size * hidden_size ( /32 if quantized)]
     void* down_proj_;  // [expert_num * hidden_size * intermediate_size ( /32 if quantized)]
-
-    #ifdef USE_NUMA
+ 
     std::vector<void*> gate_numa_;  // [numa_num, nth * stride * expert_num * hidden_size ( /32 if quantized)]
     std::vector<void*> up_numa_;    // [numa_num, nth * stride * expert_num * hidden_size ( /32 if quantized)]
     std::vector<void*> down_numa_;  // [numa_num, nth * stride * expert_num *  intermediate_size ( /32 if quantized)]
@@ -79,11 +78,7 @@ class MOE {
     };
     std::vector<NumaBlock> gate_up_blocks_;
     std::vector<NumaBlock> down_blocks_;
-
-    std::vector<NumaBlock> m_gate_up_blocks_;
-    std::vector<NumaBlock> m_down_blocks_;
-    #endif
-
+  
     float* s_input_fp32_;                      // [hidden_size]
     uint8_t* s_gate_input_;                    // [hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
     uint8_t* s_up_input_;                      // [hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
@@ -93,28 +88,36 @@ class MOE {
     std::vector<uint8_t*> s_down_input_;       // [routed_expert_num, intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
     std::vector<float*> s_down_output_;        // [routed_expert_num, hidden_size]
     float* s_output_fp32_;                     // [hidden_size]
+ 
 
-    std::vector<float*> m_input_fp32_;    // [group_max_len, hidden_size]
-    std::vector<uint8_t*> m_gate_input_;  // [group_max_len, hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
-    std::vector<uint8_t*> m_up_input_;    // [group_max_len, hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-    uint8_t* m_local_gate_input_;         // [routed_expert_num * group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
-    uint8_t* m_local_up_input_;           // [routed_expert_num * group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-    float* m_local_gate_output_;          // [routed_expert_num * group_max_len * intermediate_size]
-    float* m_local_up_output_;            // [routed_expert_num * group_max_len * intermediate_size]
-    float* m_local_intermediate_fp32_;    // [routed_expert_num * group_max_len * intermediate_size]
-    uint8_t* m_local_down_input_;         // [routed_expert_num * group_max_len * intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
-    float* m_local_down_output_;          // [routed_expert_num * group_max_len * hidden_size]
-    std::vector<float*> m_output_fp32_;   // [group_max_len, hidden_size]
+    size_t hidden_type_size;
+    size_t hidden_blk_size;
+    size_t hidden_bytes;
 
-    std::vector<std::vector<int>> m_local_pos_;          // [group_max_len, routed_expert_num]
-    std::vector<int> m_local_num_;                       // [expert_num]
-    std::vector<uint8_t*> m_local_gate_input_ptr_;       // [expert_num]
-    std::vector<uint8_t*> m_local_up_input_ptr_;         // [expert_num]
-    std::vector<float*> m_local_gate_output_ptr_;        // [expert_num]
-    std::vector<float*> m_local_up_output_ptr_;          // [expert_num]
-    std::vector<float*> m_local_intermediate_fp32_ptr_;  // [expert_num]
-    std::vector<uint8_t*> m_local_down_input_ptr_;       // [expert_num]
-    std::vector<float*> m_local_down_output_ptr_;        // [expert_num]
+    ggml_type gate_vec_type;
+    size_t gate_type_size;
+    size_t gate_blk_size;
+    size_t gate_bytes;
+
+    ggml_type up_vec_type;
+    size_t up_type_size;
+    size_t up_blk_size;
+    size_t up_bytes;
+
+    ggml_type down_vec_type;
+    size_t down_type_size;
+    size_t down_blk_size;
+    size_t down_bytes;
+
+    std::vector<float*> input_fp32_numa_;        //[numa_nodes, group_max_len * hidden_size]
+    std::vector<uint8_t*> gate_input_numa_;      //[numa_nodes, group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
+    std::vector<uint8_t*> up_input_numa_;        //[numa_nodes, group_max_len * hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
+    std::vector<float*> gate_output_numa_;       //[numa_nodes, group_max_len * routed_expert_num * intermediate_size]
+    std::vector<float*> up_output_numa_;         //[numa_nodes, group_max_len * routed_expert_num * intermediate_size]
+    std::vector<uint8_t*> down_input_numa_;      //[numa_nodes, group_max_len * routed_expert_num * intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
+    std::vector<float*> down_output_numa_;       //[numa_nodes, group_max_len * routed_expert_num * hidden_size]
+    std::vector<float*> output_fp32_numa_;       //[numa_nodes, group_max_len * hidden_size]
+ 
 };
 
 #endif
