@@ -38,7 +38,6 @@ std::vector<CpuInfo> get_cpu_info(int & num_cores_) {
     int max_package_id = 0;
     for (int i = 0; i < total_cpus; ++i) {
         CpuInfo info{};
-        info.cpuid_id = i;
         
         const std::string cpu_dir = "/sys/devices/system/cpu/cpu" + std::to_string(i);
         
@@ -50,8 +49,10 @@ std::vector<CpuInfo> get_cpu_info(int & num_cores_) {
         if(!info.is_logic_core){
             num_cores_++;
             info.core_id = i;
+            info.cpuid_id = i;
         }else{
-            info.core_id = i - total_cpus/2;
+            info.core_id = i % total_cpus; 
+            info.cpuid_id = i;
         }
 
         result.push_back(info);
@@ -102,15 +103,14 @@ Backend_NUMA::Backend_NUMA(int threads_per_node) {
         if(!hyper_threading){
             cpu_id = node_id * cpu_per_node_ + offset * cpu_per_node_ / thread_per_node_; 
         }else{ 
-            cpu_id = node_id * core_per_node_ + offset % core_per_node_;
+            cpu_id= node_id * core_per_node_ + offset % core_per_node_;
             if(offset >= core_per_node_){
-                cpu_id = cpu_id + num_cpus_/2;
-                assert(cpu_info[cpu_id].is_logic_core);
+                cpu_id = cpu_id + num_cores_;
             }
             
         }
         thread_to_cpu_id[i] = cpu_id;
-        cpu_to_thread_id[cpu_id] = i;
+        cpu_to_thread_id[cpu_id] = i; 
         std::cout << "Backend_NUMA init, thread_id: " << i << " cpu_id:" << cpu_id << " core_id:" << cpu_info[cpu_id].core_id << std::endl;
     }
     thread_state_.resize(num_cpus_);
@@ -263,8 +263,8 @@ void Backend_NUMA::process_tasks(int cpu_id) {
     } 
 
     if(num_cpus_ > num_cores_){
-        int begin = numa_node_ * core_per_node_ + num_cpus_/2;
-        int end =  begin + core_per_node_ + num_cpus_/2;
+        begin = numa_node_ * core_per_node_ + num_cores_;
+        end =  begin + core_per_node_;
         for (int i = begin; i < end; i++) { 
             if (i == cpu_id) continue;
             if (thread_state_[cpu_id]->status.load(std::memory_order_acquire) !=
@@ -292,17 +292,15 @@ void Backend_NUMA::process_tasks(int cpu_id) {
 
 void Backend_NUMA::worker_thread(int cpu_id) {
     auto start = std::chrono::steady_clock::now(); 
-    #ifdef USE_NUMA
-    if (numa_node_ == -1) { 
-        if(cpu_id > num_cores_){
-            numa_node_ = (cpu_id - num_cpus_ /2) / cpu_per_node_; 
-        }else{
-            numa_node_ = cpu_id / cpu_per_node_; 
-        } 
-        bind_to_cpu(cpu_id); 
-        set_numa_mempolicy(numa_node_);
-    }
-    #endif
+ 
+    if(cpu_id >= num_cores_) 
+        numa_node_ = (cpu_id - num_cores_) / core_per_node_; 
+    else
+        numa_node_ = cpu_id / core_per_node_; 
+  
+    bind_to_cpu(cpu_id); 
+    set_numa_mempolicy(numa_node_);
+    
     while (true) {
         ThreadStatus status =
             thread_state_[cpu_id]->status.load(std::memory_order_acquire);
