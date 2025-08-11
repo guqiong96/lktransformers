@@ -328,9 +328,8 @@ void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, c
 
 void MOE::forward_many(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend) {
     
-    if(qlen <= numa_nodes_){
+    if(qlen < numa_nodes_){
         std::cerr << "qlen must ge than numa nodes "<< std::endl;
-        std::abort();
     }
     int base = qlen / numa_nodes_;
     int remain = qlen % numa_nodes_;
