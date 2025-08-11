@@ -40,7 +40,7 @@ git submodule update --init --recursive --verbose
 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
 
 ### 运行示例
-THREADS_PER_NODE=8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Downloads/KTransformers/ktransformers/server/main.py \
+THREADS_PER_NODE=8 python ~/Downloads/KTransformers/ktransformers/server/main.py \
     --gguf_path ~/Models/Kimi-K2-Instruct-GGUF  \
     --model_path ~/Models/Kimi-K2-Instruct \
     --model_name Kimi-K2  \
