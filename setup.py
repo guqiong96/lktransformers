@@ -588,12 +588,26 @@ class CMakeBuild(BuildExtension):
 
         if not build_temp.exists():
             build_temp.mkdir(parents=True)
-        run_command_with_live_tail(ext.name,
-            ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp
-        )
-        run_command_with_live_tail(ext.name,
-            ["cmake", "--build", build_temp, "--verbose", *build_args], cwd=build_temp
-        )
+        # run_command_with_live_tail(ext.name,
+        #     ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp
+        # )
+        # run_command_with_live_tail(ext.name,
+        #     ["cmake", "--build", build_temp, "--verbose", *build_args], cwd=build_temp
+        # )
+        try:
+            # CMake配置
+            config_cmd = ["cmake", str(ext.sourcedir)] + cmake_args
+            print(f"Configuring {ext.name}: {' '.join(config_cmd)}")
+            subprocess.run(config_cmd, cwd=str(build_temp), check=True)
+            
+            # 编译
+            build_cmd = ["cmake", "--build", str(build_temp), "--verbose"] + build_args
+            print(f"Building {ext.name}: {' '.join(build_cmd)}")
+            subprocess.run(build_cmd, cwd=str(build_temp), check=True)
+            
+            print(f"Successfully built {ext.name}")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to build {ext.name}: {e}") from e
 
 if CUDA_HOME is not None or ROCM_HOME is not None:
     ops_module = CUDAExtension('KTransformersOps', [

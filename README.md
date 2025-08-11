@@ -53,7 +53,7 @@ THREADS_PER_NODE=8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python ~/Dow
     --optimize_config_path ~/Downloads/KTransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat-serve.yaml \
     --force_think \
     --use_cuda_graph \
-    --host :: \
+    --host 0.0.0.0 \
     --port 8070 \
     --max_batch_size 4 \
     --backend_type balance_serve
