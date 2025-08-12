@@ -3,8 +3,8 @@
  * @Author       : chenht2022
  * @Date         : 2024-07-22 02:03:22
  * @Version      : 1.0.0
- * @LastEditors  : chenht2022
- * @LastEditTime : 2024-07-25 10:35:10
+ * @LastEditors  : guqiong96
+ * @LastEditTime : 2025-08-12 10:35:10
  * @Copyright (c) 2024 by KVCache.AI, All Rights Reserved.
  **/
 #ifndef CPUINFER_OPERATOR_MOE_H
@@ -82,12 +82,10 @@ class MOE {
     float* s_input_fp32_;                      // [hidden_size]
     uint8_t* s_gate_input_;                    // [hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
     uint8_t* s_up_input_;                      // [hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-    std::vector<float*> s_gate_output_;        // [routed_expert_num, intermediate_size]
-    std::vector<float*> s_up_output_;          // [routed_expert_num, intermediate_size]
-    std::vector<float*> s_intermediate_fp32_;  // [routed_expert_num, intermediate_size]
-    std::vector<uint8_t*> s_down_input_;       // [routed_expert_num, intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
-    std::vector<float*> s_down_output_;        // [routed_expert_num, hidden_size]
-    float* s_output_fp32_;                     // [hidden_size]
+    float* s_gate_output_;        // [routed_expert_num, intermediate_size]
+    float* s_up_output_;          // [routed_expert_num, intermediate_size] 
+    uint8_t* s_down_input_;       // [routed_expert_num, intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
+    float* s_down_output_;        // [routed_expert_num, hidden_size]
  
 
     size_t hidden_type_size;

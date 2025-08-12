@@ -109,7 +109,7 @@ def bench_moe(quant_mode: str):
         weights = torch.rand((layer_num, qlen, n_routed_experts), dtype=torch.float32, device = "cuda").to("cpu").contiguous()
         input = torch.randn((layer_num, qlen, hidden_size), dtype=torch.bfloat16, device = "cuda").to("cpu").contiguous()
         output = torch.empty((layer_num, qlen, hidden_size), dtype=torch.bfloat16, device = "cuda").to("cpu").contiguous()
-        batch_size_tensor = torch.tensor(45)
+        batch_size_tensor = torch.tensor(len)
         # warm up
         for i in range(warm_up_iter):
             CPUInfer.submit(
