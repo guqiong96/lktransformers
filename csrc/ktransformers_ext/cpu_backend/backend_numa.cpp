@@ -372,32 +372,22 @@ void set_numa_mempolicy(int node_id) {
     numa_free_nodemask(mask);
 }
 
-void* allocate_aligned_numa(size_t size, int node, size_t* out_total_size = nullptr) {
-    const size_t alignment = 64;
+ 
+void* allocate_aligned_numa(size_t size, int node) { 
+    size_t alignment = 64;
     size_t total_size = size + alignment - 1;
     void* raw_ptr = numa_alloc_onnode(total_size, node);
     if (!raw_ptr) return nullptr;
- 
+     
     uintptr_t addr = reinterpret_cast<uintptr_t>(raw_ptr);
     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
-    void* aligned_ptr = reinterpret_cast<void*>(aligned_addr);
- 
-    uintptr_t* save_ptr = reinterpret_cast<uintptr_t*>(aligned_ptr) - 2;
-    save_ptr[0] = reinterpret_cast<uintptr_t>(raw_ptr);  
-    save_ptr[1] = total_size;                             
-
-    if (out_total_size) *out_total_size = total_size;
-    return aligned_ptr;
+    return reinterpret_cast<void*>(aligned_addr);
 }
- 
-void free_aligned_numa(void* aligned_ptr, size_t size) {
-    if (!aligned_ptr) return;
- 
-    uintptr_t* save_ptr = reinterpret_cast<uintptr_t*>(aligned_ptr) - 2;
-    void* raw_ptr = reinterpret_cast<void*>(save_ptr[0]);
-    size_t total_size = save_ptr[1];
 
-    numa_free(raw_ptr, total_size);
+void free_aligned_numa(void* aligned_ptr, size_t size) {
+    uintptr_t addr = reinterpret_cast<uintptr_t>(aligned_ptr);
+    void* raw_ptr = reinterpret_cast<void*>(addr & ~(63));
+    numa_free(raw_ptr, size);
 }
 
 void* allocate_aligned(size_t size) {
