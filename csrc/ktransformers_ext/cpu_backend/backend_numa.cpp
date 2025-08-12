@@ -390,7 +390,7 @@ void* allocate_aligned_numa(size_t size, int node, size_t* out_total_size = null
     return aligned_ptr;
 }
  
-void free_aligned_numa(void* aligned_ptr) {
+void free_aligned_numa(void* aligned_ptr, size_t size) {
     if (!aligned_ptr) return;
  
     uintptr_t* save_ptr = reinterpret_cast<uintptr_t*>(aligned_ptr) - 2;
