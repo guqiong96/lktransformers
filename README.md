@@ -1,5 +1,5 @@
 # LKtransformers - 开启NUMA内存占用不翻倍
-[2025-08-10 decode提升速度，32节点为最优速度]
+[2025-08-12 decode提升速度，32节点为最优速度]
 
 [2025-08-10 prefill提升速度，32节点为最优速度，同时优化了超线程支持]
 
@@ -74,5 +74,6 @@ THREADS_PER_NODE=8 python ~/Downloads/KTransformers/ktransformers/server/main.py
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
-![Weixin Image_2025-08-02_183944_421](https://github.com/user-attachments/assets/8f227407-2e0c-48b1-a677-ff0545b5b7a8)
+![bc390b444ef70830ca34eff35227fa9f](https://github.com/user-attachments/assets/d16f3ab0-09e2-4751-a1cc-68dddaf6bf4c)
+
  
