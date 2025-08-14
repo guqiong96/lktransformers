@@ -247,8 +247,7 @@ static void act_fn(float* up, float* gate, int n) {
  
     }
  
-#endif
-#if defined(__AVX2__)
+#elif defined(__AVX2__)
     constexpr int VEC_SIZE = 8;
     const __m256 v_log2e = _mm256_set1_ps(1.44269504089f);  // log2(e) ≈ 1.44269504089
     const __m256 v_ln2 = _mm256_set1_ps(0.69314718056f);    // ln(2) ≈ 0.69314718056
