@@ -212,8 +212,8 @@ static void act_fn(float* up, float* gate, int n) {
     constexpr int VEC_SIZE = 16; 
 
     for (int i = 0; i <= n - VEC_SIZE; i += VEC_SIZE) {
-        __m256 gate_val = _mm256_load_ps(gate + i); 
-        __m256 up_val = _mm256_load_ps(up + i);   
+        __m512 gate_val = _mm512_load_ps(gate + i); 
+        __m512 up_val = _mm512_load_ps(up + i);   
 
         const __m512 log2e = _mm512_set1_ps(1.44269504089f);
         const __m512 c1 = _mm512_set1_ps(0.69314718056f);
