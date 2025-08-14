@@ -14,7 +14,7 @@
 #ifdef USE_NUMA
 #include <numa.h>
 #include <numaif.h>
-#endif
+#endif 
 
 
 
@@ -24,7 +24,7 @@ MOE::MOE(MOEConfig config) {
     gate_proj_ = config_.gate_proj;
     up_proj_ = config_.up_proj;
     down_proj_ = config_.down_proj;
-
+    
     hidden_type_size = ggml_type_size(config_.hidden_type);
     hidden_blk_size = ggml_blck_size(config_.hidden_type);
     hidden_bytes = config_.hidden_size * hidden_type_size / hidden_blk_size;
@@ -43,12 +43,12 @@ MOE::MOE(MOEConfig config) {
     down_type_size = ggml_type_size(down_vec_type);
     down_blk_size = ggml_blck_size(down_vec_type);
     down_bytes = config_.intermediate_size * down_type_size / down_blk_size;
-    
+
     if(numa_nodes_ <= 8){
-        config_.stride = QK_K;
         config_.group_min_len = 8;
-    }else
+    }else{
         config_.group_min_len = numa_nodes_;
+    }
     config_.group_max_len = 1024;
      
     gate_numa_.resize(numa_nodes_);
@@ -157,6 +157,11 @@ MOE::MOE(MOEConfig config) {
     output_fp32_ = (float*)allocate_aligned(config_.group_max_len * sizeof(float) * config_.hidden_size);  
 
     std::cout << "config_.stride : " << config_.stride << " down_blk_size :" << down_blk_size << " hidden_blk_size :" << hidden_blk_size << std::endl;
+    std::cout << "config_.hidden_type : " << ggml_internal_get_type_traits(config_.hidden_type).type_name << std::endl;
+    std::cout << "config_.gate_type : " << ggml_internal_get_type_traits(config_.gate_type).type_name << std::endl;
+    std::cout << "config_.up_type : " << ggml_internal_get_type_traits(config_.up_type).type_name << std::endl;
+    std::cout << "config_.down_type : " << ggml_internal_get_type_traits(config_.down_type).type_name << std::endl;
+    
     std::cout << "MOE init success ." << std::endl;
 }
 
@@ -200,8 +205,106 @@ void MOE::warm_up(Backend* backend) {
     }
 }
 
-static float act_fn(float x) {
-    return x / (1.0f + expf(-x));
+
+
+static void act_fn(float* up, float* gate, int n) {
+#if defined(__AVX512F__)   
+    constexpr int VEC_SIZE = 16; 
+
+    for (int i = 0; i <= n - VEC_SIZE; i += VEC_SIZE) {
+        __m256 gate_val = _mm256_load_ps(gate + i); 
+        __m256 up_val = _mm256_load_ps(up + i);   
+
+        const __m512 log2e = _mm512_set1_ps(1.44269504089f);
+        const __m512 c1 = _mm512_set1_ps(0.69314718056f);
+
+        __m512 neg_gate_val = _mm512_sub_ps(_mm512_setzero_ps(), gate_val);
+
+        __m512 y = _mm512_mul_ps(neg_gate_val, log2e);
+        __m512i int_part = _mm512_cvtps_epi32(y);
+        __m512 frac_part = _mm512_sub_ps(y, _mm512_cvtepi32_ps(int_part));
+
+        const __m512 poly_1 = _mm512_set1_ps(0.9999999995f);
+        const __m512 poly_2 = _mm512_set1_ps(0.6931471805f);
+        const __m512 poly_3 = _mm512_set1_ps(0.2402265069f);
+        const __m512 poly_4 = _mm512_set1_ps(0.0555041087f);
+        const __m512 poly_5 = _mm512_set1_ps(0.0096181291f);
+        const __m512 poly_6 = _mm512_set1_ps(0.0013333558f);
+
+        __m512 frac_exp = _mm512_fmadd_ps(
+            frac_part, poly_6,
+            _mm512_fmadd_ps(frac_part, poly_5,
+                            _mm512_fmadd_ps(frac_part, poly_4,
+                                            _mm512_fmadd_ps(frac_part, poly_3, _mm512_fmadd_ps(frac_part, poly_2, poly_1)))));
+
+        __m512 two_pow_i = _mm512_scalef_ps(_mm512_set1_ps(1.0f), _mm512_cvtepi32_ps(int_part));
+        __m512 exp_neg_gate = _mm512_mul_ps(two_pow_i, frac_exp);
+
+         __m512 denom = _mm512_add_ps(_mm512_set1_ps(1.0f), exp_neg_gate);
+        __m512 act_val = _mm512_div_ps(gate_val, denom);
+
+        _mm512_store_ps(up + i, _mm512_mul_ps(act_val, up_val));
+ 
+    }
+ 
+#endif
+#if defined(__AVX2__)
+    constexpr int VEC_SIZE = 8;
+    const __m256 v_log2e = _mm256_set1_ps(1.44269504089f);  // log2(e) ≈ 1.44269504089
+    const __m256 v_ln2 = _mm256_set1_ps(0.69314718056f);    // ln(2) ≈ 0.69314718056
+    const __m256 v_one = _mm256_set1_ps(1.0f);
+    const __m256 v_neg_inf = _mm256_set1_ps(-128.0f);       // 限制x的最小值（避免2^k下溢）
+    const __m256 v_pos_inf = _mm256_set1_ps(127.0f);        // 限制x的最大值（避免2^k上溢）
+    for (int i = 0; i < n; i += VEC_SIZE) {
+        __m256 v_gate = _mm256_load_ps(gate + i);  // gate[i..i+7]
+        __m256 v_up = _mm256_load_ps(up + i);      // up[i..i+7]
+
+        // 计算x = gate * log2(e)（等价于 gate / ln(2)）
+        __m256 v_x = _mm256_mul_ps(v_gate, v_log2e);
+
+        // 限制x范围以避免2^k溢出（k为x的整数部分）
+        v_x = _mm256_max_ps(_mm256_min_ps(v_x, v_pos_inf), v_neg_inf);
+
+        // 分离x的整数部分k和小数部分r（k = trunc(x)）
+        __m256i v_k = _mm256_cvtps_epi32(v_x);          // 整数部分（截断小数）
+        __m256 v_k_f = _mm256_cvtepi32_ps(v_k);         // 转换为浮点整数
+        __m256 v_r = _mm256_sub_ps(v_x, v_k_f);         // 小数部分r = x - k
+
+        // 计算2^k（通过位操作快速生成浮点数）
+        __m256i v_k_bias = _mm256_add_epi32(v_k, _mm256_set1_epi32(127));  // 指数偏移（float的bias=127）
+        __m256i v_k_bits = _mm256_slli_epi32(v_k_bias, 23);               // 左移23位生成浮点位模式
+        __m256 v_two_k = _mm256_castsi256_ps(v_k_bits);                   // 2^k的浮点表示
+
+        // 计算2^r（使用泰勒展开近似：2^r = e^(r*ln2) ≈ 1 + t + t²/2 + t³/6 + t⁴/24，t=r*ln2）
+        __m256 v_t = _mm256_mul_ps(v_r, v_ln2);                          // t = r*ln2
+        __m256 v_t2 = _mm256_mul_ps(v_t, v_t);                           // t²
+        __m256 v_t3 = _mm256_mul_ps(v_t2, v_t);                          // t³
+        __m256 v_t4 = _mm256_mul_ps(v_t3, v_t);                          // t⁴
+        __m256 v_two_r = _mm256_add_ps(v_one, 
+            _mm256_fmadd_ps(v_t, v_one, 
+                _mm256_fmadd_ps(v_t2, _mm256_set1_ps(1.0f/2.0f), 
+                    _mm256_fmadd_ps(v_t3, _mm256_set1_ps(1.0f/6.0f), 
+                        _mm256_mul_ps(v_t4, _mm256_set1_ps(1.0f/24.0f))))));
+
+        // 计算2^x = 2^k * 2^r
+        __m256 v_two_x = _mm256_mul_ps(v_two_k, v_two_r);
+
+        // 计算sigmoid(gate) = 2^x / (1 + 2^x)（等价于 1/(1 + exp(-gate))）
+        __m256 v_denom = _mm256_add_ps(v_one, v_two_x);
+        __m256 v_sigmoid = _mm256_div_ps(v_two_x, v_denom);
+
+        // 计算swish = up * (gate * sigmoid) = up * (gate / (1 + exp(-gate)))
+        __m256 v_swish = _mm256_mul_ps(v_gate, v_sigmoid);
+        __m256 v_out = _mm256_mul_ps(v_up, v_swish);
+
+        // 存储结果
+        _mm256_store_ps(up + i, v_out);
+    }
+#else 
+    for (int i = 0; i < n; ++i) {
+    up[i] = up[i] * (gate[i] / (1.0f + expf(-gate[i])));
+    }
+#endif
 }
 
 void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend) {
@@ -238,7 +341,7 @@ void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, c
         int expert_idx = task_id % k;
         uint64_t expert_id = expert_ids[expert_idx];
         int offset = 0;  
-        int ith =  start_block + offset; 
+        int ith =  start_block + offset;  
         size_t n_stride = config_.stride * num_blocks;
 
         size_t offsets_i = expert_idx * config_.intermediate_size;
@@ -252,9 +355,7 @@ void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, c
         float* up_output_ptr = s_up_output_ + offsets_i + ith * config_.stride;
         llamafile_sgemm(n_stride, 1, config_.hidden_size / ggml_blck_size(config_.up_type), up_proj_ptr, config_.hidden_size / ggml_blck_size(config_.up_type), up_input_ptr, config_.hidden_size / ggml_blck_size(config_.up_type), up_output_ptr, n_stride, 0, 1, GGML_TASK_TYPE_COMPUTE, config_.up_type, up_vec_type, GGML_TYPE_F32, GGML_PREC_DEFAULT);
         
-        for (int i = 0; i < n_stride; i++) {
-            up_output_ptr[i] = act_fn(gate_output_ptr[i]) * up_output_ptr[i];
-        }
+        act_fn(up_output_ptr, gate_output_ptr , n_stride);  
         if (config_.stride % down_blk_size == 0) {
             uint8_t* down_input_ptr = s_down_input_ + (offsets_i + ith * config_.stride) * down_type_size / down_blk_size;
             from_float(up_output_ptr, down_input_ptr, n_stride, down_vec_type);
@@ -277,7 +378,7 @@ void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, c
         int expert_idx = task_id % k;
         uint64_t expert_id = expert_ids[expert_idx];
         int offset = 0;    
-        int ith =  start_block + offset; 
+        int ith =  start_block + offset;  
         size_t n_stride = config_.stride * num_blocks;
        
         uint8_t* down_input_ptr = s_down_input_ + expert_idx * config_.intermediate_size * down_type_size / down_blk_size;
@@ -286,7 +387,7 @@ void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, c
 
         llamafile_sgemm(n_stride, 1, config_.intermediate_size / ggml_blck_size(config_.down_type), down_proj_ptr, config_.intermediate_size / ggml_blck_size(config_.down_type), down_input_ptr, config_.intermediate_size / ggml_blck_size(config_.down_type), down_output_ptr, n_stride, 0, 1, GGML_TASK_TYPE_COMPUTE, config_.down_type, down_vec_type, GGML_TYPE_F32, GGML_PREC_DEFAULT);
   
-    }, nullptr);
+    }, nullptr); 
     size_t nth = config_.hidden_size / config_.stride;  
     
     Backend_NUMA::getInstance().do_k_work_stealing_job(1, nth, nullptr, [&](int task_id) {
@@ -396,9 +497,7 @@ void MOE::forward_many(int qlen, int k, const uint64_t* expert_ids, const float*
             
             llamafile_sgemm(n_stride, 1, config_.hidden_size / ggml_blck_size(config_.up_type), up_proj_ptr, config_.hidden_size / ggml_blck_size(config_.up_type), up_input_ptr, config_.hidden_size / ggml_blck_size(config_.up_type), up_output_ptr, n_stride, 0, 1, GGML_TASK_TYPE_COMPUTE, config_.up_type, up_vec_type, GGML_TYPE_F32, GGML_PREC_DEFAULT);
         
-            for (int j = 0; j < n_stride; j++) {
-                up_output_ptr[j] = act_fn(gate_output_ptr[j]) * up_output_ptr[j]; 
-            }
+            act_fn(up_output_ptr, gate_output_ptr , n_stride); 
 
             if (config_.stride % ggml_blck_size(config_.down_type) == 0) { 
                 uint8_t* down_input_ptr = down_input_ + (expert_idx * config_.intermediate_size + ith * config_.stride) * down_type_size / down_blk_size;
