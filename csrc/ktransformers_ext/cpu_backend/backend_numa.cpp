@@ -294,10 +294,9 @@ void Backend_NUMA::process_tasks(int cpu_id) {
 void Backend_NUMA::worker_thread(int cpu_id) {
     auto start = std::chrono::steady_clock::now(); 
  
-    if(cpu_id >= num_cores_) 
-        numa_node_ = (cpu_id - num_cores_) / core_per_node_; 
-    else
-        numa_node_ = cpu_id / core_per_node_; 
+    
+    numa_node_ = (cpu_id % num_cores_) / core_per_node_; 
+    
   
     bind_to_cpu(cpu_id); 
     set_numa_mempolicy(numa_node_);
@@ -393,9 +392,9 @@ void free_aligned_numa(void* aligned_ptr, size_t size) {
 void* allocate_aligned(size_t size) {
     const size_t alignment = 64; 
     size_t total_size = size + alignment + sizeof(void*);
-    void* raw_ptr = std::malloc(total_size);
+    void* raw_ptr = malloc(total_size);
     if (!raw_ptr) return nullptr;
- 
+     
     uintptr_t aligned_addr = (reinterpret_cast<uintptr_t>(raw_ptr) + sizeof(void*) + alignment - 1) & ~(alignment - 1);
     void* aligned_ptr = reinterpret_cast<void*>(aligned_addr);
  
@@ -403,12 +402,12 @@ void* allocate_aligned(size_t size) {
     *prev_ptr = raw_ptr;
 
     return aligned_ptr;
-}
+} 
 
 void free_aligned(void* aligned_ptr, size_t size) {
     if (!aligned_ptr) return; 
     void** prev_ptr = reinterpret_cast<void**>(aligned_ptr) - 1;
     void* raw_ptr = *prev_ptr;
-    std::free(raw_ptr);
+    free(raw_ptr);
 }
 
