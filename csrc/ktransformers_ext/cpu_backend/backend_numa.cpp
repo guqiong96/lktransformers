@@ -103,11 +103,11 @@ Backend_NUMA::Backend_NUMA(int num_threads) {
             std::cout << "Using LK_THREADS from environment: " 
                       << num_threads << std::endl;
         }else{
-            num_threads = num_cpus_ - 2;
+            num_threads = num_cpus_ / 2;
         }
 
     }else{
-        num_threads = num_cpus_ - 2;
+        num_threads = num_cpus_ / 2;
     }
  
     max_threads_ = num_threads < numa_nodes_ ? numa_nodes_ : num_threads;  
