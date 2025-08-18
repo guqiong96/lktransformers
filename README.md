@@ -1,7 +1,8 @@
-![Weixin Image_20250818225938_10_147](https://github.com/user-attachments/assets/d20bd1f3-3d85-45b8-b744-1b81afc1f665)# LKtransformers - 开启NUMA内存占用不翻倍
-[2025-08-18 prefill提速10%, 8节点（含）以上有特别优化，8节点以下基本优化]
+# LKtransformers - 开启NUMA内存占用不翻倍
 
-[2025-08-14 AVX512 AVX2 激活函数]
+[2025-08-18 prefill提速10%, 使用环境变量LK_THREADS调节性能]
+
+[2025-08-14 AVX2 激活函数]
 
 [2025-08-12 decode提升速度，32节点为最优速度]
 

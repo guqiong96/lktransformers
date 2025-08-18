@@ -43,7 +43,7 @@ MOE::MOE(MOEConfig config) {
     down_type_size = ggml_type_size(down_vec_type);
     down_blk_size = ggml_blck_size(down_vec_type);
     down_bytes = config_.intermediate_size * down_type_size / down_blk_size;
-
+    
     if(numa_nodes_ <= 8){
         config_.group_min_len = 8;
     }else{
@@ -163,10 +163,8 @@ MOE::MOE(MOEConfig config) {
     std::cout << "config_.down_type : " << ggml_internal_get_type_traits(config_.down_type).type_name << std::endl;
  
     forward_one_impl = &MOE::forward_one;
-    forward_many_impl = &MOE::forward_many_numa;
-    if(numa_nodes_ < 8){
-        forward_many_impl = &MOE::forward_many;
-    }
+    forward_many_impl = &MOE::forward_many;
+
 
     std::cout << "MOE init success ." << std::endl;
 }
