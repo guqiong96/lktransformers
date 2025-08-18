@@ -1,4 +1,4 @@
-# LKtransformers - 开启NUMA内存占用不翻倍
+![Weixin Image_20250818225938_10_147](https://github.com/user-attachments/assets/d20bd1f3-3d85-45b8-b744-1b81afc1f665)# LKtransformers - 开启NUMA内存占用不翻倍
 [2025-08-18 prefill提速10%, 8节点（含）以上有特别优化，8节点以下基本优化]
 
 [2025-08-14 AVX512 AVX2 激活函数]
@@ -79,6 +79,7 @@ LK_THREADS=96 python ~/Downloads/KTransformers/ktransformers/server/main.py \
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
-![bc390b444ef70830ca34eff35227fa9f](https://github.com/user-attachments/assets/d16f3ab0-09e2-4751-a1cc-68dddaf6bf4c)
+![Weixin Image_20250818225938_10_147](https://github.com/user-attachments/assets/4ff43a0b-3055-44ea-9f96-558eb69f5486)
+
 
  
