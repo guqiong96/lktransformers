@@ -164,6 +164,9 @@ MOE::MOE(MOEConfig config) {
  
     forward_one_impl = &MOE::forward_one;
     forward_many_impl = &MOE::forward_many_numa;
+    if(numa_nodes_ < 8){
+        forward_many_impl = &MOE::forward_many;
+    }
 
     std::cout << "MOE init success ." << std::endl;
 }
@@ -493,7 +496,7 @@ void MOE::forward_many(int qlen, int k, const uint64_t* expert_ids, const float*
         int start_block = down_blocks_[nid].start_block;
         int num_blocks = down_blocks_[nid].num_blocks;
  
-         int x = task_id - start_block * (qlen*k);
+        int x = task_id - start_block * (qlen*k);
         int token_id = x / (k*num_blocks);
         int y = x % (k*num_blocks);
         int expert_idx = token_id * k + y / num_blocks; 
@@ -641,29 +644,7 @@ void MOE::forward_one_numa(int k, const uint64_t* expert_ids, const float* weigh
 }
 
 void MOE::forward_many_numa(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend) {
-    
-    if(qlen < numa_nodes_){
-        std::cerr << "qlen must ge than numa nodes "<< std::endl;
-    }
-    int base = qlen / numa_nodes_;
-    int remain = qlen % numa_nodes_;
-    std::vector<NumaBlock> token_blocks(numa_nodes_);
-    std::vector<int> token_numa_node(qlen);
-    int current_block = 0; 
-    for (int nid = 0; nid < numa_nodes_; nid++) {
-        int n_blocks = (base + (nid < remain));
-        token_blocks[nid] = NumaBlock{
-            .node_id = nid,
-            .start_block = current_block,
-            .num_blocks = n_blocks
-        };
-        for(int i = current_block; i < current_block + n_blocks; i++){ 
-            token_numa_node[i] = nid;
-        }
-        
-        current_block += n_blocks; 
-
-    }
+     
 
     Backend_NUMA::getInstance().do_k_work_stealing_job(1, qlen, nullptr, [&](int task_id) {
         int nid = Backend_NUMA::numa_node_;  
