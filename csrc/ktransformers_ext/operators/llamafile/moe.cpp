@@ -163,7 +163,7 @@ MOE::MOE(MOEConfig config) {
     std::cout << "config_.down_type : " << ggml_internal_get_type_traits(config_.down_type).type_name << std::endl;
  
     forward_one_impl = &MOE::forward_one;
-    forward_many_impl = &MOE::forward_many;
+    forward_many_impl = &MOE::forward_many_numa;
 
     std::cout << "MOE init success ." << std::endl;
 }
