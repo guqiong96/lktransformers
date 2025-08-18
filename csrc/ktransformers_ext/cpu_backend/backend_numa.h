@@ -57,6 +57,8 @@ public:
         static Backend_NUMA instance;
         return instance;
     }
+    void init_cpu_info();
+
     int get_num_threads();
      
     void do_k_work_stealing_job(int, int,
@@ -75,16 +77,35 @@ public:
     static thread_local int thread_local_id_;
 
 private:
-    Backend_NUMA(int threads_per_node = 8);   
+    Backend_NUMA(int num_threads = 32);   
     ~Backend_NUMA();
-    int num_threads_; 
+    int max_threads_; 
     int num_cpus_;
-    int num_cores_;
-    int cpu_per_node_;
-    int thread_per_node_;
-    int core_per_node_;
-    std::vector<int> thread_to_cpu_id;
-    std::vector<int> cpu_to_thread_id;
+    int num_cores_; 
+    int cpus_per_node_;
+    int hyper_threading_open_ = false;
+    std::vector<int> cpu_to_thread_id_;
+
+    struct CpuInfo {
+        int cpuid_id;
+        int core_id;
+        int node_id;
+        int package_id;
+        int logic_idx;
+    };
+
+    struct ThreadInfo
+    {
+        int thread_id;
+        int cpu_id;
+        int core_id;
+        int node_id;
+        int package_id;
+        int logic_idx;
+    }; 
+    std::vector<std::vector<int>> node_threads_;
+    std::vector<CpuInfo> cpus_info_; 
+    std::vector<ThreadInfo> threads_info_; 
     std::vector<A_ThreadState *> thread_state_; // [thread_num]
     std::function<void(int)> init_func_;
     std::function<void(int)> compute_func_;

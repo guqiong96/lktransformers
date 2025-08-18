@@ -26,8 +26,8 @@ n_routed_experts = 6
 layer_num = 2
 qlen = 1
 CPUInfer = cpuinfer_ext.CPUInfer(64)
-warm_up_iter = 1000
-test_iter = 10000
+warm_up_iter = 2
+test_iter = 2
 
 def bench_moe(quant_mode: str):
     with torch.inference_mode(mode=True):
@@ -149,13 +149,13 @@ def bench_moe(quant_mode: str):
         print('Bandwidth: ', hidden_size * intermediate_size * 3 * n_routed_experts * bytes_per_elem * test_iter / total_time / 1000 / 1000 / 1000, 'GB/s')
         print('')
 
+bench_moe("q4_k_m")
 bench_moe("fp32")
 bench_moe("fp16")
 bench_moe("bf16")
 bench_moe("q8_0")
 bench_moe("q6_k")
 bench_moe("q5_k_m")
-bench_moe("q4_k_m")
 bench_moe("q3_k_m")
 bench_moe("q2_k")
 # Not supported on __x86_64__

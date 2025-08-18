@@ -52,11 +52,17 @@ class MOE {
     MOE(MOEConfig);
     ~MOE();
     void warm_up(Backend* backend);
-    void forward_one(int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
-    void forward_many(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
     void forward(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, int* batch_size_tensor, Backend* backend);
 
    private:
+    void forward_one(int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
+    void forward_many(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
+    void forward_one_numa(int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
+    void forward_many_numa(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
+    using ForwardOneImpl = void (MOE::*)(int, const uint64_t*, const float*, const void*, void*, Backend*);
+    using ForwardManyImpl = void (MOE::*)(int, int, const uint64_t*, const float*, const void*, void*, Backend*);
+    ForwardOneImpl forward_one_impl;
+    ForwardManyImpl forward_many_impl;
     MOEConfig config_;
     void* gate_proj_;  // [expert_num * intermediate_size * hidden_size ( /32 if quantized)]
     void* up_proj_;    // [expert_num * intermediate_size * hidden_size ( /32 if quantized)]
