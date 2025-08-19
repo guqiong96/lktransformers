@@ -408,42 +408,34 @@ void MOE::forward_one(int k, const uint64_t* expert_ids, const float* weights, c
 void MOE::forward_many(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend) {
      
     int nth = config_.hidden_size / config_.stride; 
-    Backend_NUMA::getInstance().do_k_work_stealing_job(qlen, nth, nullptr, [&](int task_id) {
+    Backend_NUMA::getInstance().do_k_work_stealing_job(1, qlen, nullptr, [&](int task_id) {
         int nid = Backend_NUMA::numa_node_;  
-
-        int start_block = down_blocks_[nid].start_block;
-        int num_blocks = down_blocks_[nid].num_blocks;
-
-        int x = task_id - start_block * qlen;
-        int token_id = x / num_blocks;  
-        int offset = x % num_blocks; 
-        int ith = start_block + offset;
-        size_t n_stride = config_.stride;
+        int token_id = task_id;  
         
-        size_t offset_bytes = (token_id * config_.hidden_size + ith * config_.stride);
-        uint8_t* input_uint8_ptr = (uint8_t*)input +  offset_bytes * hidden_type_size / hidden_blk_size;
-        float* input_fp32_ptr = input_fp32_ + offset_bytes;
-        uint8_t* gate_input_ptr = gate_input_ + offset_bytes * gate_type_size / gate_blk_size;
-        uint8_t* up_input_ptr = up_input_ + offset_bytes * up_type_size / up_blk_size;
+
+        uint8_t* input_uint8_ptr = (uint8_t*)input + token_id * hidden_bytes;
+        float* input_fp32_ptr = input_fp32_ + token_id * config_.hidden_size;
+        uint8_t* gate_input_ptr = gate_input_ + token_id * gate_bytes;
+        uint8_t* up_input_ptr = up_input_ + token_id * up_bytes;
 
         if (config_.hidden_type == gate_vec_type && config_.hidden_type == up_vec_type) {
-            memcpy(gate_input_ptr, input_uint8_ptr, n_stride * hidden_type_size / hidden_blk_size);
+            memcpy(gate_input_ptr, input_uint8_ptr, hidden_bytes);
             // up not need to copy
         } else {
-            to_float(input_uint8_ptr, input_fp32_ptr, n_stride, config_.hidden_type);
+            to_float(input_uint8_ptr, input_fp32_ptr, config_.hidden_size, config_.hidden_type);
             if (gate_vec_type == up_vec_type) {
-                from_float(input_fp32_ptr, gate_input_ptr, n_stride, gate_vec_type);
+                from_float(input_fp32_ptr, gate_input_ptr, config_.hidden_size, gate_vec_type);
                 // up not need to copy
             } else {
                 if (config_.hidden_type != gate_vec_type) {
-                    from_float(input_fp32_ptr, gate_input_ptr, n_stride, gate_vec_type);
+                    from_float(input_fp32_ptr, gate_input_ptr, config_.hidden_size, gate_vec_type);
                 } else {
-                    memcpy(gate_input_ptr, input_uint8_ptr, n_stride * hidden_type_size / hidden_blk_size);
+                    memcpy(gate_input_ptr, input_uint8_ptr, hidden_bytes);
                 }
                 if (config_.hidden_type != up_vec_type) {
-                    from_float(input_fp32_ptr, up_input_ptr, n_stride, up_vec_type); 
+                    from_float(input_fp32_ptr, up_input_ptr, config_.hidden_size, up_vec_type); 
                 } else {
-                    memcpy(up_input_ptr, input_uint8_ptr, n_stride * hidden_type_size / hidden_blk_size);
+                    memcpy(up_input_ptr, input_uint8_ptr, hidden_bytes);
                 }
             }
         }
