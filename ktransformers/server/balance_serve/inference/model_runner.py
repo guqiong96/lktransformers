@@ -143,7 +143,7 @@ class ModelRunner:
             self.outputs_buf.append(None)
         
             torch.cuda.synchronize()
-            for warm_up_iters in range(2):
+            for warm_up_iters in range(11):
                 with torch.cuda.stream(self.stream):
                     self.outputs_buf[i] = self.model(self.input[i], self.features_buf[i], self.bsz_tensor_buf, self.num_tokens_tensor_buf, self.page_idx_buf[i], self.page_offset_buf[i], cuda_graph_idx=i)
             torch.cuda.synchronize()
