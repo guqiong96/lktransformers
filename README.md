@@ -39,7 +39,7 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 
 ### 安装步骤
 
-git clone https://github.com/guqiong96/ktransformers.git
+git clone https://github.com/guqiong96/lktransformers.git
 
 git checkout full-support-numa
 
@@ -47,8 +47,14 @@ git submodule update --init --recursive --verbose
 
 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
 
+### 更新源码
+
+git pull
+
+USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
+
 ### 运行示例
-LK_THREADS=96 python ~/Downloads/KTransformers/ktransformers/server/main.py \
+LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/server/main.py \
     --gguf_path ~/Models/Kimi-K2-Instruct-GGUF  \
     --model_path ~/Models/Kimi-K2-Instruct-GGUF \
     --model_name Kimi-K2-Instruct-GGUF  \
