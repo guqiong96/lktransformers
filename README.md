@@ -43,7 +43,7 @@ git clone https://github.com/guqiong96/lktransformers.git
 
 git checkout full-support-numa
 
-git submodule update --init --recursive --verbose
+git submodule update --init --recursive
 
 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
 
