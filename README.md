@@ -10,7 +10,7 @@
 
 [2025-08-02 修复sh install.sh在shell为dash时的兼容posix问题，导致未能安装自带flashinfer,出现的一些莫名问题
 RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True后报错等
-更新代码重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh 或者 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh]
+更新代码重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh]
 
 [2025-08-01 解决 16G 显卡加载 Kimi K2 的显存峰值问题]
 
@@ -45,13 +45,13 @@ git checkout full-support-numa
 
 git submodule update --init --recursive
 
-USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
+USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 
 ### 更新源码
 
 git pull
 
-USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
+USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 
 ### 运行示例
 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/server/main.py \
@@ -82,7 +82,7 @@ LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/server/main.py \
 
 ## 📌 注意事项
 
-1. 更新后出现疑难问题，运行 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh
+1. 更新后出现疑难问题，运行 USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
