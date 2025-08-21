@@ -224,6 +224,7 @@ void Backend_NUMA::do_work(int nth, std::function<void(int)> init_func,
 
     for (int i = 0; i < max_threads_; i++) {
         while (thread_state_[i]->status.load(std::memory_order_acquire) == ThreadStatus::WORKING) {
+            std::this_thread::yield();
         }
     }
 }
@@ -263,7 +264,7 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
 
     for (int i = 0; i < max_threads_; i++) { 
         while (thread_state_[i]->status.load(std::memory_order_acquire) == ThreadStatus::WORKING) {
-
+            std::this_thread::yield();
         }
     }
 }
@@ -339,9 +340,11 @@ void Backend_NUMA::worker_thread(int thread_id) {
             if (duration > 50) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
+            std::this_thread::yield();
         } else if (status == ThreadStatus::EXIT) {
             return;
         }
+        
     }
 } 
 

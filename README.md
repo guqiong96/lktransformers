@@ -1,5 +1,7 @@
 # LKtransformers - 开启NUMA内存占用不翻倍
 
+[2025-08-21 降低线程占用CPU，避免内存温度上升过快，prefill切换至numa最优化版本]
+
 [2025-08-18 prefill提速10%, 使用环境变量LK_THREADS调节性能]
 
 [2025-08-14 AVX2 激活函数]
@@ -32,7 +34,7 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 
 1. 支持 AMX 的 CPU 使用 amx 配置文件会报错（AMX 后台NUMA改造未完成）
 2. Prefill 性能下降（已解决）
-3. 报错 `RuntimeError: pidfd_getfd: Operation not permitted`可以去掉PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True 运行，速度变慢，提交问题到这里(已解决， 重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh 或者 USE_BALANCE_SERVE=1 USE_NUMA=1 sh install.sh)
+3. 报错 `RuntimeError: pidfd_getfd: Operation not permitted`可以去掉PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True(已解决， 重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh)
 4. Intel 至强平台，或者开启超线程运行速度慢（已解决）
 
 ## 🚀 快速开始

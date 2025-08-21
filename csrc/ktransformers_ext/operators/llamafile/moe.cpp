@@ -43,13 +43,6 @@ MOE::MOE(MOEConfig config) {
     down_type_size = ggml_type_size(down_vec_type);
     down_blk_size = ggml_blck_size(down_vec_type);
     down_bytes = config_.intermediate_size * down_type_size / down_blk_size;
-    
-    if(numa_nodes_ <= 8){
-        config_.group_min_len = 8;
-    }else{
-        config_.group_min_len = numa_nodes_;
-    }
-    config_.group_max_len = 1024;
      
     gate_numa_.resize(numa_nodes_);
     up_numa_.resize(numa_nodes_);
@@ -163,7 +156,7 @@ MOE::MOE(MOEConfig config) {
     std::cout << "config_.down_type : " << ggml_internal_get_type_traits(config_.down_type).type_name << std::endl;
  
     forward_one_impl = &MOE::forward_one;
-    forward_many_impl = &MOE::forward_many;
+    forward_many_impl = &MOE::forward_many_numa;
 
 
     std::cout << "MOE init success ." << std::endl;
@@ -479,12 +472,13 @@ void MOE::forward_many(int qlen, int k, const uint64_t* expert_ids, const float*
         }
     }, nullptr);
     if (config_.stride % ggml_blck_size(config_.down_type) != 0) {
-        Backend_NUMA::getInstance().do_k_work_stealing_job(k, qlen, nullptr, [&](int task_id) {
+        Backend_NUMA::getInstance().do_k_work_stealing_job(1, qlen*k, nullptr, [&](int task_id) {
             int nid = Backend_NUMA::numa_node_;  
             int token_id = task_id / k;  
-            int expert_idx = token_id * k + task_id % k;
-            float* up_output_ptr_ = up_output_ + expert_idx * config_.intermediate_size;
-            uint8_t* down_input_ptr = down_input_ + (expert_idx * config_.intermediate_size) * down_type_size / down_blk_size;
+            int ith = token_id * k +  task_id % k;
+            
+            float* up_output_ptr_ = up_output_ + ith * config_.intermediate_size;
+            uint8_t* down_input_ptr = down_input_ + (ith * config_.intermediate_size) * down_type_size / down_blk_size;
             from_float(up_output_ptr_, down_input_ptr, config_.intermediate_size, down_vec_type);
         }, nullptr);
     }   
