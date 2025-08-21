@@ -5,7 +5,7 @@ set -e
 DEV="cuda"
 
 # parse --dev argument
-while ["$#" -gt 0 ]; do
+while [ "$#" -gt 0 ]; do
     case $1 in
         --dev) DEV="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;

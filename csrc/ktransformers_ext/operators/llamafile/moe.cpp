@@ -787,12 +787,12 @@ void MOE::forward(int qlen, int k, const uint64_t* expert_ids, const float* weig
     
     if (qlen < config_.group_min_len) {
         for (int i = 0; i < qlen; i++) {
-            forward_one(k, expert_ids + i * k, weights + i * k, (uint8_t*)input + i * hidden_bytes, (uint8_t*)output + i * hidden_bytes, backend);
+            (this->*forward_one_impl)(k, expert_ids + i * k, weights + i * k, (uint8_t*)input + i * hidden_bytes, (uint8_t*)output + i * hidden_bytes, backend);
         }
         return;
     }
     int forward_len = std::min(config_.group_max_len, qlen);
-    forward_many(forward_len, k, expert_ids, weights, input, output, backend);
+    (this->*forward_many_impl)(forward_len, k, expert_ids, weights, input, output, backend);
 
     batch_size_tensor[0] -= forward_len;
     forward(qlen - forward_len, k, expert_ids + forward_len * k, weights + forward_len * k, (uint8_t*)input + forward_len * hidden_bytes, (uint8_t*)output + forward_len * hidden_bytes, batch_size_tensor, backend);
