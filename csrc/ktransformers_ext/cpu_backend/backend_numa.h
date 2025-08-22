@@ -122,6 +122,6 @@ void* allocate_aligned(size_t size);
 void free_aligned_numa(void* aligned_ptr, size_t size);
 void free_aligned(void* aligned_ptr, size_t size); 
 
-bool power_saving_mode_ = false; 
+bool power_saving_mode_; 
 
 #endif

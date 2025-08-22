@@ -91,7 +91,7 @@ Backend_NUMA::Backend_NUMA(int num_threads) {
 
     const char* env_power_saving = std::getenv("LK_POWER_SAVING");
      
-
+    power_saving_mode_ = false;
     if (env_power_saving != nullptr) { 
         std::string val(env_power_saving);
         std::transform(val.begin(), val.end(), val.begin(), ::tolower);
