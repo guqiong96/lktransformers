@@ -76,6 +76,8 @@ public:
     #endif
     static thread_local int thread_local_id_;
 
+    bool power_saving_mode_; 
+
 private:
     Backend_NUMA(int num_threads = 32);   
     ~Backend_NUMA();
@@ -122,6 +124,6 @@ void* allocate_aligned(size_t size);
 void free_aligned_numa(void* aligned_ptr, size_t size);
 void free_aligned(void* aligned_ptr, size_t size); 
 
-bool power_saving_mode_; 
+
 
 #endif
