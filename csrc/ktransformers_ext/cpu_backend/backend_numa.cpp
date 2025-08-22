@@ -16,6 +16,7 @@
 #include <string>
 #include <fstream>
 #include <set>
+#include <algorithm> 
 
 thread_local int Backend_NUMA::numa_node_ = -1;
 thread_local int Backend_NUMA::thread_local_id_ = -1;
@@ -87,6 +88,19 @@ void Backend_NUMA::init_cpu_info() {
 Backend_NUMA::Backend_NUMA(int num_threads) {
     
     init_cpu_info();
+
+    const char* env_power_saving = std::getenv("LK_POWER_SAVING");
+     
+
+    if (env_power_saving != nullptr) { 
+        std::string val(env_power_saving);
+        std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+        
+        if (val == "1" || val == "true" || val == "yes" || val == "on") {
+            power_saving_mode_ = true;
+            std::cout << "Using LK_POWER_SAVING from environment: " << val << std::endl;
+        }
+    }
 
     const char* env_threads = std::getenv("LK_THREADS");
     if (env_threads != nullptr) { 
@@ -224,7 +238,7 @@ void Backend_NUMA::do_work(int nth, std::function<void(int)> init_func,
 
     for (int i = 0; i < max_threads_; i++) {
         while (thread_state_[i]->status.load(std::memory_order_acquire) == ThreadStatus::WORKING) {
-            std::this_thread::yield();
+            if(power_saving_mode_) std::this_thread::yield();
         }
     }
 }
@@ -264,7 +278,7 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
 
     for (int i = 0; i < max_threads_; i++) { 
         while (thread_state_[i]->status.load(std::memory_order_acquire) == ThreadStatus::WORKING) {
-            std::this_thread::yield();
+            if(power_saving_mode_) std::this_thread::yield();
         }
     }
 }
@@ -340,7 +354,7 @@ void Backend_NUMA::worker_thread(int thread_id) {
             if (duration > 50) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
-            std::this_thread::yield();
+            if(power_saving_mode_) std::this_thread::yield();
         } else if (status == ThreadStatus::EXIT) {
             return;
         }

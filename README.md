@@ -1,5 +1,7 @@
 # LKtransformers - 开启NUMA内存占用不翻倍
 
+[2025-08-22 prefill使用一次多tonken矩阵计算的numa最优化版本， 增加环境变量LK_POWER_SAVING，默认为关闭，开启时使用环境变量LK_POWER_SAVING=1 可以缓解内存过热降速]
+
 [2025-08-21 降低线程占用CPU，避免内存温度上升过快，prefill切换至numa最优化版本]
 
 [2025-08-18 prefill提速10%, 使用环境变量LK_THREADS调节性能]
@@ -56,7 +58,7 @@ git pull
 USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 
 ### 运行示例
-LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/server/main.py \
+LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/server/main.py \
     --gguf_path ~/Models/Kimi-K2-Instruct-GGUF  \
     --model_path ~/Models/Kimi-K2-Instruct-GGUF \
     --model_name Kimi-K2-Instruct-GGUF  \

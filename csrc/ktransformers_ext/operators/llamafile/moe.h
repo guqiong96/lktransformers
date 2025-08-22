@@ -59,6 +59,7 @@ class MOE {
     void forward_many(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
     void forward_one_numa(int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
     void forward_many_numa(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
+    void forward_many_m(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, Backend* backend);
     using ForwardOneImpl = void (MOE::*)(int, const uint64_t*, const float*, const void*, void*, Backend*);
     using ForwardManyImpl = void (MOE::*)(int, int, const uint64_t*, const float*, const void*, void*, Backend*);
     ForwardOneImpl forward_one_impl;
@@ -121,6 +122,10 @@ class MOE {
     uint8_t* down_input_;      //[ group_max_len * routed_expert_num * intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
     float* down_output_;       //[ group_max_len * routed_expert_num * hidden_size]
     float* output_fp32_;       //[ group_max_len * hidden_size]
+
+    uint8_t* m_gate_input_;      //[ group_max_len * routed_expert_num * hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
+    uint8_t* m_up_input_;        //[ group_max_len * routed_expert_num * hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
+
  
 };
 
