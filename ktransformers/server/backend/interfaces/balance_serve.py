@@ -277,7 +277,8 @@ def run_engine(args, token_queue, broadcast_endpoint, event, kvcache_event):
     engine = Engine(args, token_queue, broadcast_endpoint, kvcache_event)
     if args.use_cuda_graph:
         engine.model_runner.warmup()
-        
+    print(f"OK to serve!")
+    print(f"LKTransformers Server Started !")
     event.set()
     engine.loop()
 
@@ -301,61 +302,15 @@ class BalanceServeInterface(BackendInterfaceBase):
     def __init__(self, args: ConfigArgs = default_args):
         self.args = args
         self.queue_map:dict[int,asyncio.Queue] = {}
-        self.thread_map: dict[int, int] = {}
-        processes = []
+        self.thread_map: dict[int, int] = {} 
         self.broadcast_endpoint = tempfile.NamedTemporaryFile(delete=False).name # @TODO add to config
-        ctx = mp.get_context("spawn")
-        self.token_queue = ctx.Queue(maxsize=1000) 
+
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir, trust_remote_code=True)
         self.sched_client = SchedulerClient(args.sched_port)
         self.streamer = TextStreamer(self.tokenizer)
-
-        start_event = ctx.Event()
-        kvcache_event = ctx.Event()
-
-        p = ctx.Process(target=run_engine, args=(self.args, self.token_queue, self.broadcast_endpoint, start_event, kvcache_event))
-        p.start()
-        processes.append(p)
-        kvcache_event.wait()
-
-
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            pickle.dump(args, temp_file)
-            temp_file_path = temp_file.name
-        current_file = __file__
-        target_file = os.path.join(os.path.dirname(current_file), "..", "..", "balance_serve", "sched_rpc.py")
-        target_file = os.path.normpath(target_file)
-        log_path = os.path.join(args.log_dir, "rpc.log")
-        log = open(log_path, "a") 
-        sched_process = subprocess.Popen(
-            ["python3", target_file, "--config", temp_file_path], 
-            stdout=log, 
-            stderr=log
-        )
-        print("sched_rpc started with PID:", sched_process.pid)
-
-        def signal_handler(signum, frame):
-            print(f"Received signal {signum}, shutting down...")
-            cleanup()
-            os._exit(0) 
-
-        def cleanup():
-            print("Cleaning up...")
-
-            for p in processes:
-                if p.is_alive():
-                    print(f"Terminating subprocess {p.pid}")
-                    p.terminate()
-                    p.join()
-
-            if sched_process and sched_process.poll() is None:
-                print(f"Terminating sched_process {sched_process.pid}")
-                sched_process.terminate()
-                sched_process.wait()
-        signal.signal(signal.SIGINT, signal_handler)   
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        start_event.wait()
+ 
+        self.token_queue = None
+    
     
     def get_params(self, temperature: Optional[float] = None, top_p: Optional[float] = None, 
                    max_tokens: Optional[float] = None, max_completion_tokens: Optional[float] = None) -> tuple[float, float]:

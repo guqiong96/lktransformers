@@ -29,6 +29,7 @@ def create_interface(config: Config, default_args: ConfigArgs):
         raise NotImplementedError(f'{config.backend_type} not implemented')
     GlobalInterface.interface = BackendInterface(default_args)
     GlobalContextManager.context_manager = ThreadContextManager(GlobalInterface.interface)
+    return GlobalInterface.interface 
 
 class GlobalContextManager:
     context_manager: ThreadContextManager

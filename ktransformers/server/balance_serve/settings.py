@@ -44,7 +44,7 @@ def create_sched_settings(args):
     settings.recommended_chunk_prefill_token_count = (chunk_size - max_decode_batch_size) // 2
     settings.sample_options = default_sample_options
     settings.sched_metrics_port = args.sched_metrics_port
-    settings.gpu_only = args.memory_gpu_only
+    settings.gpu_only = bool(args.memory_gpu_only) if args.memory_gpu_only else True
     settings.use_self_defined_head_dim = True
     settings.self_defined_head_dim = 576
     settings.full_kv_cache_on_each_gpu = True
@@ -151,7 +151,7 @@ def create_sched_settings_qwen3moe(args):
     settings.recommended_chunk_prefill_token_count = (chunk_size - max_decode_batch_size) // 2
     settings.sample_options = default_sample_options
     settings.sched_metrics_port = args.sched_metrics_port
-    settings.gpu_only = args.memory_gpu_only
+    settings.gpu_only = bool(args.memory_gpu_only) if args.memory_gpu_only else True
     settings.use_self_defined_head_dim = False
     settings.self_defined_head_dim = 576
     settings.full_kv_cache_on_each_gpu = True
