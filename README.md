@@ -1,4 +1,5 @@
 # LKtransformers - 开启NUMA内存占用不翻倍
+[2025-08-29 将计算进程放主进程运行，接口、调度放子进程，方便调试及及时发现错误提示] 
 
 [2025-08-22 prefill使用一次多tonken矩阵计算的numa最优化版本， 增加环境变量LK_POWER_SAVING，默认为关闭，开启时使用环境变量LK_POWER_SAVING=1 可以缓解内存过热降速]
 
@@ -31,6 +32,8 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
   - `KVCache-ai/Kimi-K2-Instruct-GGUF`
   - `deepseek-ai/DeepSeek-R1-0528`
   - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF`
+  - `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`
+  - `unsloth/DeepSeek-V3.1-GGUF`
 
 ## ⚠️ 已知问题
 
@@ -38,6 +41,7 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 2. Prefill 性能下降（已解决）
 3. 报错 `RuntimeError: pidfd_getfd: Operation not permitted`可以去掉PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True(已解决， 重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh)
 4. Intel 至强平台，或者开启超线程运行速度慢（已解决）
+5. 推理测试多轮以后或使用长输入会话出现错误，检查并确保cache_lens = max_new_tokens + 2048， 并且cache_lens、max_new_tokens为 1024 的倍数。
 
 ## 🚀 快速开始
 
@@ -64,7 +68,7 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
     --model_name Kimi-K2-Instruct-GGUF  \
     --cpu_infer 28 \
     --max_new_tokens 16384 \
-    --cache_lens 16384 \
+    --cache_lens 18432 \
     --cache_q4 true \
     --temperature 0.6 \
     --top_p 0.95 \
@@ -86,7 +90,9 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
 
 ## 📌 注意事项
 
-1. 更新后出现疑难问题，运行 USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
+1. 更新后出现疑难问题，在主目录运行 
+  git pull
+  USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
