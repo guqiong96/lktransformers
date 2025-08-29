@@ -658,7 +658,7 @@ struct QueryMaintainer : public Scheduler {
       SPDLOG_DEBUG("set new batch {}", fmt::ptr(new_batch));
     }
     if (flag) {
-      SPDLOG_INFO("Batch {} is not consumed", fmt::ptr(old_batch));
+      SPDLOG_DEBUG("Batch {} is not consumed", fmt::ptr(old_batch));
       delete old_batch;
     }
   }

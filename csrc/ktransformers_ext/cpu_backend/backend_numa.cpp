@@ -230,10 +230,15 @@ void Backend_NUMA::do_work(int nth, std::function<void(int)> init_func,
     for (int i = 0; i < max_threads_; i++) {
         begin = end;
         end = begin + (base + (i < remain));    
-        if(begin >= end) break;
-        thread_state_[i]->end = end; 
-        thread_state_[i]->curr.store(begin, std::memory_order_relaxed);
-        thread_state_[i]->status.store(ThreadStatus::WORKING, std::memory_order_release);
+        if (begin >= end) { 
+            thread_state_[i]->status.store(ThreadStatus::WAITING, std::memory_order_release);
+            thread_state_[i]->end = -1; 
+            thread_state_[i]->curr.store(nth+1, std::memory_order_relaxed);
+        } else {
+            thread_state_[i]->curr.store(begin, std::memory_order_relaxed);
+            thread_state_[i]->end = end;
+            thread_state_[i]->status.store(ThreadStatus::WORKING, std::memory_order_release);
+        }
     } 
 
     for (int i = 0; i < max_threads_; i++) {
@@ -261,6 +266,9 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
     for (int nid = 0; nid < numa_nodes_; nid++) {
         int n_tasks = (base + (nid < remain)) * k;  
         int n_threads = node_threads_[nid].size();
+        if (n_threads == 0) {
+            continue; 
+        }
           
         int t_base= n_tasks / n_threads;
         int t_remain = n_tasks % n_threads;
@@ -269,10 +277,15 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
             int tid = node_threads_[nid][j];
             begin = end;
             end = begin + t_base + (j < t_remain ? 1 : 0);
-            if(begin >= end) break;
-            thread_state_[tid]->curr.store(begin, std::memory_order_relaxed);
-            thread_state_[tid]->end = end;
-            thread_state_[tid]->status.store(ThreadStatus::WORKING, std::memory_order_release);
+            if (begin >= end) { 
+                thread_state_[tid]->status.store(ThreadStatus::WAITING, std::memory_order_release);
+                thread_state_[tid]->end = -1; 
+                thread_state_[tid]->curr.store(tasks+1, std::memory_order_relaxed);
+            } else {
+                thread_state_[tid]->curr.store(begin, std::memory_order_relaxed);
+                thread_state_[tid]->end = end;
+                thread_state_[tid]->status.store(ThreadStatus::WORKING, std::memory_order_release);
+            }
         }
     }
 
@@ -290,6 +303,10 @@ void Backend_NUMA::process_tasks(int thread_id) {
         init_func_(thread_id);
     }
     while (true) {
+        if (thread_state_[thread_id]->status.load(std::memory_order_acquire) !=
+            ThreadStatus::WORKING) {
+            break;
+        } 
         int task_id = thread_state_[thread_id]->curr.fetch_add(
             1, std::memory_order_acq_rel);
         if (task_id >= thread_state_[thread_id]->end) {
