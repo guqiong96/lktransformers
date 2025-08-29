@@ -41,7 +41,8 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 2. Prefill 性能下降（已解决）
 3. 报错 `RuntimeError: pidfd_getfd: Operation not permitted`可以去掉PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True(已解决， 重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh)
 4. Intel 至强平台，或者开启超线程运行速度慢（已解决）
-5. 推理测试多轮以后或使用长输入会话出现错误，检查并确保cache_lens = max_new_tokens + 2048， 并且cache_lens、max_new_tokens为 1024 的倍数。
+5. 推理测试多轮以后或使用长输入会话出现错误，检查并确保cache_lens = max_new_tokens + 2048， 并且cache_lens、max_new_tokens为 1024 的倍数， 如要设置max_batch_size， 显存足够的情况下增加相应倍数的cache_lens。
+6. Eingine error: The size of tensor a (4)must match the size of tensor b (5) at non-singleton dimension 0 ,
 
 ## 🚀 快速开始
 
@@ -77,7 +78,6 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
     --use_cuda_graph \
     --host 0.0.0.0 \
     --port 8070 \
-    --max_batch_size 4 \
     --backend_type balance_serve \
     --chunk_size 1024
 
