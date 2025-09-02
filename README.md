@@ -30,7 +30,7 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 - **已验证模型**：
   - `KVCache-ai/Kimi-K2-Instruct-GGUF`
   - `deepseek-ai/DeepSeek-R1-0528`
-  - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF`
+  - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL.gguf `
     <img width="1000" height="1364" alt="image" src="https://github.com/user-attachments/assets/0eaef315-71a4-4371-9cac-a54e3e640f80" />
 
   - `unsloth/DeepSeek-V3.1-GGUF/UD-Q4_K_XL`
