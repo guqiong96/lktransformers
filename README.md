@@ -31,6 +31,11 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
   - `KVCache-ai/Kimi-K2-Instruct-GGUF`
   - `deepseek-ai/DeepSeek-R1-0528`
   - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF`
+    <img width="1000" height="1364" alt="image" src="https://github.com/user-attachments/assets/0eaef315-71a4-4371-9cac-a54e3e640f80" />
+
+  - `unsloth/DeepSeek-V3.1-GGUF/UD-Q4_K_XL`
+    <img width="1000" height="1364" alt="image" src="https://github.com/user-attachments/assets/493eb4f6-b807-4408-841b-da0d8046e94d" />
+
 
 ## ⚠️ 已知问题
 
@@ -64,7 +69,7 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
     --model_name Kimi-K2-Instruct-GGUF  \
     --cpu_infer 28 \
     --max_new_tokens 16384 \
-    --cache_lens 16384 \
+    --cache_lens 18432 \
     --cache_q4 true \
     --temperature 0.6 \
     --top_p 0.95 \
@@ -73,7 +78,6 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
     --use_cuda_graph \
     --host 0.0.0.0 \
     --port 8070 \
-    --max_batch_size 4 \
     --backend_type balance_serve \
     --chunk_size 1024
 
@@ -90,7 +94,8 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
-![Weixin Image_20250818225938_10_147](https://github.com/user-attachments/assets/4ff43a0b-3055-44ea-9f96-558eb69f5486)
+
+![a42193311f0cf149b9204ea8f3ad37d6](https://github.com/user-attachments/assets/874b2c38-0edb-42b0-a017-0e5f7ec1294e)
 
 
  
