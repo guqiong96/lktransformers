@@ -4,7 +4,7 @@ project(cpuinfer_ext VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS "-fPIC -O3 -ffast-math -march=native -fopenmp -Wall -Wextra")
+set(CMAKE_CXX_FLAGS "-fPIC -O3 -ffast-math -fopenmp")
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_GLIBCXX_USE_CXX11_ABI})
 set(CMAKE_BUILD_TYPE "Release")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -Wall -fPIC -fno-pie -no-pie -fno-inline -fno-omit-frame-pointer -fno-optimize-sibling-calls -mamx-int8 -mamx-tile -mavx512vnni -mavx512f -mavx512bw -mavx512dq")
