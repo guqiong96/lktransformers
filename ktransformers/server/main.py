@@ -24,7 +24,7 @@ import torch.multiprocessing as mp
 from multiprocessing import Process, Event
 from torch.multiprocessing import Queue
 import signal
-from fast_api import start_fast_api
+from ktransformers.server.fast_api import start_fast_api
  
 
 def main():  

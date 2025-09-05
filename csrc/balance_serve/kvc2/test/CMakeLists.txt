@@ -1,7 +1,6 @@
 
-set(CMAKE_CXX_FLAGS "-Og -march=native -Wall -Wextra -g -fopenmp")
-# set(CMAKE_CXX_FLAGS "-O3 -march=native -Wall -Wextra -pthread")
-
+# set(CMAKE_CXX_FLAGS "-Og -march=native -Wall -Wextra -g -fopenmp")
+set(CMAKE_CXX_FLAGS "-fPIC -O3 -ffast-math -march=native -fopenmp -Wall -Wextra")
 add_subdirectory(kvc2test)
 
 

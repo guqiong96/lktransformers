@@ -619,7 +619,7 @@ if CUDA_HOME is not None or ROCM_HOME is not None:
             'cxx': ['-O3', '-DKTRANSFORMERS_USE_CUDA'],
             'nvcc': [
                 '-O3',
-                # '--use_fast_math',
+                '--use_fast_math',
                 '-Xcompiler', '-fPIC',
                 '-DKTRANSFORMERS_USE_CUDA',
             ]

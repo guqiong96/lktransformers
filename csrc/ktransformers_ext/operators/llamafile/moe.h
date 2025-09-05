@@ -24,7 +24,12 @@
 #include "llama.cpp/ggml-quants.h"
 #include "llama.cpp/ggml.h"
 #include "llamafile/sgemm.h"
-
+// #define __AMX_INT8__ 1
+// #define __AVX512VNNI__ 1
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+    #include "amx_gemm.hpp"
+#endif
+ 
 struct MOEConfig {
     int expert_num;
     int routed_expert_num;
@@ -78,6 +83,9 @@ class MOE {
     size_t stride_gate_bytes_;
     size_t stride_up_bytes_; 
     size_t stride_down_bytes_;
+    size_t amx_stride_gate_bytes_;
+    size_t amx_stride_up_bytes_; 
+    size_t amx_stride_down_bytes_;
     struct NumaBlock {
         int node_id;
         int start_block;
@@ -85,14 +93,15 @@ class MOE {
     };
     std::vector<NumaBlock> gate_up_blocks_;
     std::vector<NumaBlock> down_blocks_;
-  
+
     float* s_input_fp32_;                      // [hidden_size]
+    float* s_gate_output_;        // [routed_expert_num, intermediate_size]
+    float* s_up_output_;          // [routed_expert_num, intermediate_size]
+    float* s_down_output_;        // [routed_expert_num, hidden_size] 
     uint8_t* s_gate_input_;                    // [hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
     uint8_t* s_up_input_;                      // [hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-    float* s_gate_output_;        // [routed_expert_num, intermediate_size]
-    float* s_up_output_;          // [routed_expert_num, intermediate_size] 
     uint8_t* s_down_input_;       // [routed_expert_num, intermediate_size * ggml_type_size(ggml_internal_get_type_traits(down_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(down_type).vec_dot_type)]
-    float* s_down_output_;        // [routed_expert_num, hidden_size]
+  
  
 
     size_t hidden_type_size;
@@ -123,9 +132,9 @@ class MOE {
     float* down_output_;       //[ group_max_len * routed_expert_num * hidden_size]
     float* output_fp32_;       //[ group_max_len * hidden_size]
 
-    uint8_t* m_gate_input_;      //[ group_max_len * routed_expert_num * hidden_size * ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
-    uint8_t* m_up_input_;        //[ group_max_len * routed_expert_num * hidden_size * ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-
+    void* m_gate_input_;      //[ group_max_len * routed_expert_num * hidden_size //* ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
+    void* m_up_input_;        //[ group_max_len * routed_expert_num * hidden_size //* ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
+    bool input_16_to_32;
  
 };
 

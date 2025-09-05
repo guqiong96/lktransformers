@@ -26,8 +26,12 @@ rm -rf csrc/ktransformers_ext/cuda/*.egg-info
 rm -rf csrc/balance_serve/build
 rm -rf csrc/balance_serve/sched/build
 rm -rf csrc/balance_serve/kvc2/build
+rm -rf third_party/custom_flashinfer/3rdparty/cutlass/media/docs/build
+rm -rf third_party/custom_flashinfer/build
+rm -rf third_party/prometheus-cpp/3rdparty/civetweb/build
 rm -rf ~/.ktransformers
 rm -rf ~/.cache/flashinfer
+rm -rf /tmp/kvc
 echo "Installing python dependencies from requirements.txt"
 pip install -r requirements-local_chat.txt
 pip install -r ktransformers/server/requirements.txt

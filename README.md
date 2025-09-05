@@ -1,4 +1,7 @@
-# LKtransformers - 开启NUMA内存占用不翻倍
+# LKtransformers - 开启NUMA内存占用不翻倍！AMX支持GGUF模型，内存占用不翻倍, 支持NUMA加速！
+
+[2025-09-05 AMX预览版：支持GGUF模型，内存占用不翻倍，支持NUMA加速，预览版q4量化测试通过， 优化了编译参数]
+
 [2025-08-29 将计算进程放主进程运行，接口、调度放子进程，方便调试及及时发现错误提示] 
 
 [2025-08-22 prefill使用一次多tonken矩阵计算的numa最优化版本， 增加环境变量LK_POWER_SAVING，默认为关闭，开启时使用环境变量LK_POWER_SAVING=1 可以缓解内存过热降速]
@@ -31,13 +34,16 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 - **已验证模型**：
   - `KVCache-ai/Kimi-K2-Instruct-GGUF`
   - `deepseek-ai/DeepSeek-R1-0528`
-  - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF`
-  - `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`
-  - `unsloth/DeepSeek-V3.1-GGUF`
+  - `unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL.gguf `
+    <img width="1000" height="1364" alt="image" src="https://github.com/user-attachments/assets/0eaef315-71a4-4371-9cac-a54e3e640f80" />
+
+  - `unsloth/DeepSeek-V3.1-GGUF/UD-Q4_K_XL`
+    <img width="1000" height="1364" alt="image" src="https://github.com/user-attachments/assets/493eb4f6-b807-4408-841b-da0d8046e94d" />
+
 
 ## ⚠️ 已知问题
 
-1. 支持 AMX 的 CPU 使用 amx 配置文件会报错（AMX 后台NUMA改造未完成）
+1. 支持 AMX 的 CPU 使用 amx 配置文件会报错（已解决：AMX开启无需特别配置）
 2. Prefill 性能下降（已解决）
 3. 报错 `RuntimeError: pidfd_getfd: Operation not permitted`可以去掉PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True(已解决， 重新运行USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh)
 4. Intel 至强平台，或者开启超线程运行速度慢（已解决）
@@ -96,7 +102,8 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
 2. 更多安装问题请参考主线文档
 3. 定期合并主线获取最新特性
 
-![Weixin Image_20250818225938_10_147](https://github.com/user-attachments/assets/4ff43a0b-3055-44ea-9f96-558eb69f5486)
+
+![a42193311f0cf149b9204ea8f3ad37d6](https://github.com/user-attachments/assets/874b2c38-0edb-42b0-a017-0e5f7ec1294e)
 
 
  

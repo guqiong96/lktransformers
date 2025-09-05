@@ -1,6 +1,6 @@
 
-set(CMAKE_CXX_FLAGS "-Og -march=native -Wall -Wextra -g -fopenmp")
-
+#set(CMAKE_CXX_FLAGS "-Og -march=native -Wall -Wextra -g -fopenmp")
+set(CMAKE_CXX_FLAGS "-fPIC -O3 -ffast-math -march=native -fopenmp -Wall -Wextra")
 function(add_kvc2_test source_file)
     get_filename_component(target_name ${source_file} NAME_WE) # 获取不带扩展名的文件名作为目标名
     add_executable(${target_name} ${source_file})

@@ -19,7 +19,7 @@ import cpuinfer_ext
 expert_num = 32
 hidden_size = 5120
 intermediate_size = 1536
-stride = 16
+stride = 64
 group_min_len = 10
 group_max_len = 1024
 n_routed_experts = 6

@@ -17,6 +17,12 @@
 #include <fstream>
 #include <set>
 #include <algorithm> 
+// #define __AMX_INT8__ 1
+// #define __AVX512VNNI__ 1
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+    #include "../operators/llamafile/amx_gemm.hpp"
+#endif
+
 
 thread_local int Backend_NUMA::numa_node_ = -1;
 thread_local int Backend_NUMA::thread_local_id_ = -1;
@@ -233,7 +239,7 @@ void Backend_NUMA::do_work(int nth, std::function<void(int)> init_func,
         if (begin >= end) { 
             thread_state_[i]->status.store(ThreadStatus::WAITING, std::memory_order_release);
             thread_state_[i]->end = -1; 
-            thread_state_[i]->curr.store(nth+1, std::memory_order_relaxed);
+            thread_state_[i]->curr.store(0, std::memory_order_relaxed);
         } else {
             thread_state_[i]->curr.store(begin, std::memory_order_relaxed);
             thread_state_[i]->end = end;
@@ -256,8 +262,6 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
     compute_func_ = compute_func;
     finalize_func_ = finalize_func;
                                     
-    int tasks = k * nth;
-     
     int base = nth / numa_nodes_;
     int remain = nth % numa_nodes_;
      
@@ -266,7 +270,7 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
     for (int nid = 0; nid < numa_nodes_; nid++) {
         int n_tasks = (base + (nid < remain)) * k;  
         int n_threads = node_threads_[nid].size();
-        if (n_threads == 0) {
+        if (n_threads == 0 || n_tasks == 0) {
             continue; 
         }
           
@@ -280,7 +284,7 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
             if (begin >= end) { 
                 thread_state_[tid]->status.store(ThreadStatus::WAITING, std::memory_order_release);
                 thread_state_[tid]->end = -1; 
-                thread_state_[tid]->curr.store(tasks+1, std::memory_order_relaxed);
+                thread_state_[tid]->curr.store(0, std::memory_order_relaxed);
             } else {
                 thread_state_[tid]->curr.store(begin, std::memory_order_relaxed);
                 thread_state_[tid]->end = end;
@@ -318,8 +322,7 @@ void Backend_NUMA::process_tasks(int thread_id) {
         auto& this_ = threads_info_[thread_id];
         auto& other_ = threads_info_[i];
         if(this_.node_id == other_.node_id && this_.cpu_id != other_.cpu_id){
-            if (thread_state_[i]->status.load(std::memory_order_acquire) !=
-                ThreadStatus::WORKING) {
+            if (thread_state_[i]->status.load(std::memory_order_acquire) != ThreadStatus::WORKING) {
                 continue;
             } 
             while (true) {
@@ -355,6 +358,10 @@ void Backend_NUMA::worker_thread(int thread_id) {
     
     bind_to_cpu(cpu_id); 
     set_numa_mempolicy(numa_node_);
+
+    #if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+        ggml_tile_config_init();
+    #endif
     
     while (true) {
         ThreadStatus status =
@@ -433,7 +440,10 @@ void* allocate_aligned_numa(size_t size, int node) {
     size_t alignment = 64;
     size_t total_size = size + alignment - 1;
     void* raw_ptr = numa_alloc_onnode(total_size, node);
-    if (!raw_ptr) return nullptr;
+    if (!raw_ptr) {
+        std::cerr << "Failed to allocate " << size << " bytes on NUMA node " << node << std::endl;
+        return nullptr;
+    }
      
     uintptr_t addr = reinterpret_cast<uintptr_t>(raw_ptr);
     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
