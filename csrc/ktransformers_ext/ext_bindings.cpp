@@ -18,10 +18,6 @@
 #include "operators/llamafile/mlp.h"
 #include "operators/llamafile/moe.h"
 
-#if defined(__x86_64__) && defined(__HAS_AVX512F__) && defined(__HAS_AMX__)
-#include "operators/amx/moe.hpp"
-#endif
-
 #include "pybind11/functional.h"
 #include "pybind11/operators.h"
 #include "pybind11/pybind11.h"
