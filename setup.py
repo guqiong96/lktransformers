@@ -500,6 +500,8 @@ class CMakeBuild(BuildExtension):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
         ]
+        if ext.name in ["cpuinfer_ext", "balance_serve"]:
+            cmake_args += ["-DCMAKE_CXX_FLAGS=-Wno-error=unused-result"]
 
         if CUDA_HOME is not None:
             cmake_args += ["-DKTRANSFORMERS_USE_CUDA=ON"]
