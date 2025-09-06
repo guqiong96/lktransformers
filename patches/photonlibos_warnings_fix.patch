@@ -1,0 +1,25 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6ed755e..ec6068b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -61,7 +61,7 @@ if (NOT (${ARCH} STREQUAL x86_64) AND NOT (${ARCH} STREQUAL aarch64) AND NOT (${
+ endif ()
+ 
+ # Global compile options, only effective within this project
+-set(global_compile_options "-Werror -Wall -Wno-error=pragmas")
++set(global_compile_options "-Wno-error -Wall -Wno-error=pragmas")
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${global_compile_options}")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${global_compile_options}")
+ if (${CMAKE_CXX_COMPILER_ID} STREQUAL GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 8.0)
+@@ -104,6 +104,11 @@ elseif (${ARCH} STREQUAL aarch64)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=native -fsigned-char -fno-stack-protector -fomit-frame-pointer")
+ endif ()
+ 
++set_source_files_properties(
++    ${PHOTON_SOURCE_DIR}/net/vdma/shm.cpp 
++    PROPERTIES COMPILE_FLAGS "-Wno-error"
++)
++
+ # Default build type is Release
+ if (NOT CMAKE_BUILD_TYPE)
+     set(CMAKE_BUILD_TYPE Release)

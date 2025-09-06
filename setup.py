@@ -41,7 +41,46 @@ except ImportError:
     MUSA_HOME=None
 KTRANSFORMERS_BUILD_XPU = torch.xpu.is_available()
 
-# 检测 DEV_BACKEND 环境变量
+def apply_patches():
+    """Apply patches to third-party libraries"""
+    import subprocess
+    import os
+    
+    patch_file = os.path.join(os.path.dirname(__file__), "patches", "photonlibos_warnings_fix.patch")
+    photon_dir = os.path.join(os.path.dirname(__file__), "third_party", "PhotonLibOS")
+    
+    print(f"Looking for patch file: {patch_file}")
+    print(f"PhotonLibOS directory: {photon_dir}")
+    
+    if os.path.exists(patch_file):
+        try: 
+            # 使用正确的相对路径
+            patch_rel_path = os.path.relpath(patch_file, photon_dir)
+            print(f"Relative patch path: {patch_rel_path}")
+            
+            result = subprocess.run(
+                ["patch", "-p1", "--dry-run", "-d", photon_dir, "-i", patch_rel_path],
+                capture_output=True, text=True
+            )
+            
+            if result.returncode == 0: 
+                subprocess.run(
+                    ["patch", "-p1", "-d", photon_dir, "-i", patch_rel_path],
+                    check=True
+                )
+                print("Patch applied successfully")
+            else:
+                print("Patch already applied or not needed")
+                print(f"patch command output: {result.stdout}")
+                print(f"patch command error: {result.stderr}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to apply patch: {e}")
+            print(f"Error output: {e.stderr}")
+    else:
+        print(f"Patch file not found: {patch_file}")
+ 
+apply_patches()
+ 
 dev_backend = os.environ.get("DEV_BACKEND", "").lower()
 if dev_backend == "xpu":
     triton_dep = [
@@ -500,8 +539,6 @@ class CMakeBuild(BuildExtension):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
         ]
-        if ext.name in ["cpuinfer_ext", "balance_serve"]:
-            cmake_args += ["-DCMAKE_CXX_FLAGS=-Wno-error=unused-result"]
 
         if CUDA_HOME is not None:
             cmake_args += ["-DKTRANSFORMERS_USE_CUDA=ON"]
@@ -680,7 +717,7 @@ else:
     ext_modules = [
         CMakeExtension("cpuinfer_ext", os.fspath(Path("").resolve() / "csrc" / "ktransformers_ext")),
     ]
-
+     
 setup(
     name=VersionInfo.PACKAGE_NAME,
     version=VersionInfo().get_package_version(),
