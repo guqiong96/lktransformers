@@ -54,7 +54,7 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 
 ### 安装步骤
 
-git clone https://github.com/guqiong96/lktransformers.git
+git clone --recursive https://github.com/guqiong96/lktransformers.git
 
 git checkout full-support-numa
 
