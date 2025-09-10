@@ -104,7 +104,12 @@ def custom_openapi(app):
 
 def start_fast_api(cfg, args, generated_token_queue:Queue = None, start_event: Event = None, kvcache_event: Event = None):
     
-    interface = create_interface(config=cfg, default_args=cfg)
+    cfg = Config()  
+    for key, value in vars(args).items():
+        if value is not None and hasattr(cfg, key):
+            setattr(cfg, key, value)
+            
+    interface = create_interface(config=cfg, default_args=args)
     
     setattr(interface, "token_queue", generated_token_queue)
     setattr(interface, "start_event", start_event)
