@@ -18,7 +18,20 @@ from torch.multiprocessing import Queue
 from multiprocessing.synchronize import Event
 
 
-def mount_app_routes(mount_app: FastAPI):
+def mount_app_routes(mount_app: FastAPI, cfg=None):
+    if cfg is not None:
+        mount_app.state.config = cfg
+        config_singleton = Config()
+        if hasattr(cfg, 'model_name'):
+            config_singleton.model_name = cfg.model_name
+        if hasattr(cfg, 'api_key'):
+            config_singleton.api_key = cfg.api_key
+        if hasattr(cfg, 'temperature'):
+            config_singleton.temperature = cfg.temperature
+        if hasattr(cfg, 'top_p'):
+            config_singleton.top_p = cfg.top_p
+        if hasattr(cfg, 'server_port'):
+            config_singleton.server_port = cfg.server_port
     sql_util = SQLUtil()
     logger.info("Creating SQL tables")
     Base.metadata.create_all(bind=sql_util.sqlalchemy_engine)
@@ -26,13 +39,14 @@ def mount_app_routes(mount_app: FastAPI):
     mount_app.include_router(router)
 
 
-def create_app():
-    cfg = Config()
+def create_app(cfg=None):
+    if cfg is None:
+        cfg = Config()
     if(hasattr(GlobalInterface.interface, "lifespan")):
         app = FastAPI(lifespan=GlobalInterface.interface.lifespan)
     else:
         app = FastAPI()
-    if Config().web_cross_domain:
+    if cfg.web_cross_domain:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -40,7 +54,7 @@ def create_app():
             allow_methods=["*"],
             allow_headers=["*"],
         )
-    mount_app_routes(app)
+    mount_app_routes(app, cfg)
     if cfg.mount_web:
         mount_index_routes(app)
     return app
@@ -88,14 +102,14 @@ def custom_openapi(app):
     return app.openapi_schema
 
 
-def start_fast_api(cfg, args, generated_token_queue:Queue = None, broadcast_endpoint: str = None, kvcache_event: Event = None):
+def start_fast_api(cfg, args, generated_token_queue:Queue = None, start_event: Event = None, kvcache_event: Event = None):
     
     interface = create_interface(config=cfg, default_args=cfg)
     
     setattr(interface, "token_queue", generated_token_queue)
-    setattr(interface, "broadcast_endpoint", broadcast_endpoint)
+    setattr(interface, "start_event", start_event)
      
-    app = create_app()
+    app = create_app(cfg)
     custom_openapi(app)
     
     def start_queue_proxy():
