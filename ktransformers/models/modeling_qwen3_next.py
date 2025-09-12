@@ -44,24 +44,17 @@ from transformers.utils import TransformersKwargs, auto_docstring, can_return_tu
 from transformers.utils.deprecation import deprecate_kwarg
 from transformers.utils.generic import OutputRecorder, check_model_inputs
 from transformers.utils.import_utils import (
-    is_causal_conv1d_available,
-    is_flash_linear_attention_available,
+    is_causal_conv1d_available, 
 )
 from .configuration_qwen3_next import Qwen3NextConfig
 
 
-if is_causal_conv1d_available():
-    from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
-else:
-    causal_conv1d_update, causal_conv1d_fn = None, None
+causal_conv1d_update, causal_conv1d_fn = None, None
 
 
-if is_flash_linear_attention_available():
-    from fla.modules import FusedRMSNormGated
-    from fla.ops.gated_delta_rule import chunk_gated_delta_rule, fused_recurrent_gated_delta_rule
-else:
-    chunk_gated_delta_rule, fused_recurrent_gated_delta_rule = None, None
-    FusedRMSNormGated = None
+
+chunk_gated_delta_rule, fused_recurrent_gated_delta_rule = None, None
+FusedRMSNormGated = None
 
 logger = logging.get_logger(__name__)
 

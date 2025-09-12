@@ -10,7 +10,7 @@ current_file_path = os.path.abspath(__file__)
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 import pickle
 import argparse
-from ktransformers.server.balance_serve.settings import sched_ext, create_sched_settings, create_sched_settings_qwen2moe, create_sched_settings_qwen3moe, create_sched_settings_glm4moe, create_sched_settings_smallthinker, create_sched_settings_qwen3next
+from ktransformers.server.balance_serve.settings import sched_ext, create_sched_settings, create_sched_settings_qwen2moe, create_sched_settings_qwen3moe, create_sched_settings_glm4moe, create_sched_settings_qwen3next
 
 
 
