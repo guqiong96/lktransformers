@@ -62,8 +62,19 @@ MOE::MOE(MOEConfig config) {
     std::cout << "config_.hidden_type : " << ggml_internal_get_type_traits(config_.hidden_type).type_name << std::endl;
     std::cout << "config_.gate_type : " << ggml_internal_get_type_traits(config_.gate_type).type_name << std::endl;
     std::cout << "config_.up_type : " << ggml_internal_get_type_traits(config_.up_type).type_name << std::endl;
-    std::cout << "config_.down_type : " << ggml_internal_get_type_traits(config_.down_type).type_name << std::endl;
-     
+    std::cout << "config_.down_type : " << ggml_internal_get_type_traits(config_.down_type).type_name << std::endl; 
+    std::cout << "gate_type_size: " << gate_type_size << std::endl;
+    std::cout << "gate_blk_size: " << gate_blk_size << std::endl;
+    std::cout << "gate_bytes: " << gate_bytes << std::endl;
+    std::cout << "up_type_size: " << up_type_size << std::endl;
+    std::cout << "up_blk_size: " << up_blk_size << std::endl;
+    std::cout << "up_bytes: " << up_bytes << std::endl;
+    std::cout << "down_type_size: " << down_type_size << std::endl;
+    std::cout << "down_blk_size: " << down_blk_size << std::endl;
+    std::cout << "down_bytes: " << down_bytes << std::endl;
+    std::cout << "config_.hidden_size: " << config_.hidden_size << std::endl;
+    std::cout << "config_.intermediate_size: " << config_.intermediate_size << std::endl; 
+    
     gate_numa_.resize(numa_nodes_);
     up_numa_.resize(numa_nodes_);
     down_numa_.resize(numa_nodes_); 
