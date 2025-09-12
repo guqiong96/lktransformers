@@ -62,10 +62,9 @@ class KDeepseekV3ForCausalLM(DeepseekV3PreTrainedModel):
         features = []
         for i in range(batch.batch_size):
             tokens = batch.minibatch.tokens.contiguous()
-            # 获取embed_tokens的设备，遵循配置文件设置
             embed_device = next(self.model.embed_tokens.parameters()).device
             feature = (
-                self.model.embed_tokens(tokens.to(embed_device))
+                self.model.embed_tokens(tokens.to(torch.device('cpu')))
                 .to(torch.bfloat16)
                 .to(device=device)
             )

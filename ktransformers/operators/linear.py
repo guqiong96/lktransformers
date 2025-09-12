@@ -468,19 +468,15 @@ class VLinearMarlin16(KLinearBase):
     def load(self, w: dict | nn.Parameter | tuple | None = None, device: str|None = None):
         if self.loaded: 
             return
-        
-        # 强制禁用act_order
+         
         self.act_order = False
-        
-        # 设备处理逻辑
+         
         target_device = torch.device(device) if device else self.device
         gpu_device = torch.device("cuda:0") if torch.cuda.is_available() else target_device
-        
-        # 权重加载到CPU
+         
         if w is None: 
             w = self.load_weight(device="cpu")
-        
-        # 权重解析
+         
         if isinstance(w, nn.Parameter):
             weight = w.view(self.orin_out_features, self.orin_in_features).T
             self.has_bias = False
@@ -491,22 +487,17 @@ class VLinearMarlin16(KLinearBase):
             self.has_bias = True
         else:
             raise ValueError("Invalid weight type")
-        
-        # 确保在CPU上处理
+         
         weight = weight.cpu().float()
         if self.has_bias and self.bias is not None:
             self.bias = self.bias.cpu().float()
-        
-        # 应用padding
+         
         if self.padding:
             padded_weight = torch.zeros(self.in_features, self.out_features, device="cpu")
             padded_weight[:self.orin_in_features, :self.orin_out_features] = weight
             weight = padded_weight
         
-        # =====================================================================
-        # 分块量化核心逻辑（确保合并后与整体量化一致）
-        # =====================================================================
-        chunk_size = 1024  # 可调整的分块大小
+        chunk_size = 1024  
         num_chunks = (weight.shape[1] + chunk_size - 1) // chunk_size
         marlin_q_w_chunks = []
         marlin_s_chunks = []
@@ -515,65 +506,46 @@ class VLinearMarlin16(KLinearBase):
             start_col = i * chunk_size
             end_col = min((i + 1) * chunk_size, weight.shape[1])
             weight_chunk = weight[:, start_col:end_col]
-            
-            # 仅将当前块移至GPU
+             
             weight_chunk = weight_chunk.to(gpu_device)
-            
-            # 量化当前块（强制act_order=False）
+             
             with torch.no_grad():
                 marlin_q_w, marlin_s, _, _, _ = marlin_quantize(
                     weight_chunk, self.num_bits, self.group_size, False
                 )
-            
-            # 收集量化结果（保留在GPU）
+             
             marlin_q_w_chunks.append(marlin_q_w)
             marlin_s_chunks.append(marlin_s)
-            
-            # 显存清理（防止OOM）
+             
             del weight_chunk, marlin_q_w, marlin_s
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-        
-        # =====================================================================
-        # 关键合并逻辑（确保与整体量化一致）
-        # =====================================================================
-        # 1. 量化权重合并：沿列拼接
+         
         self.marlin_q_w = torch.cat(marlin_q_w_chunks, dim=1)
-        
-        # 2. scales合并：特殊处理分组尺寸
+         
         if self.group_size > 0 and self.group_size < weight.shape[0]:
-            # 分组量化情况：每个分组有独立scale值
             num_groups = (weight.shape[0] + self.group_size - 1) // self.group_size
             scale_blocks = []
             
-            for s in marlin_s_chunks:
-                # 将scale重塑为[group_count, N]
+            for s in marlin_s_chunks: 
                 s = s.view(num_groups, -1)
                 scale_blocks.append(s)
-            
-            # 沿列拼接scale块
+             
             self.marlin_s = torch.cat(scale_blocks, dim=1)
-        else:
-            # 完整层量化：简单拼接
+        else: 
             self.marlin_s = torch.cat(marlin_s_chunks, dim=1)
-        
-        # act_order=False时始终为空
+         
         self.g_idx = torch.empty(0, dtype=torch.int32, device=target_device)
         self.sort_indices = torch.empty(0, dtype=torch.int32, device=target_device)
         
-        # =====================================================================
-        # 最终设置（确保结果一致性）
-        # =====================================================================
         self.weight = self.marlin_q_w
         self.workspace = MarlinWorkspace(
             self.out_features, GPTQ_MARLIN_MIN_THREAD_N, GPTQ_MARLIN_MAX_PARALLEL, target_device
         )
-        
-        # 保持原始维度信息（非padded尺寸）
+         
         self.k = self.orin_in_features
         self.n = self.orin_out_features
-        
-        # 移动最终结果到目标设备
+         
         self.weight = self.weight.to(target_device).contiguous()
         self.marlin_s = self.marlin_s.to(target_device).contiguous()
         

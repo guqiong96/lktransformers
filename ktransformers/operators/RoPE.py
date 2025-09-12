@@ -22,11 +22,11 @@ from ktransformers.models.modeling_deepseek import (
     yarn_linear_ramp_mask,
     yarn_find_correction_range
 )
-from ktransformers.models.modeling_glm4_moe import Glm4MoeRotaryEmbedding
 from ktransformers.operators.base_operator import BaseInjectedModule
 from ktransformers.util.custom_loader import GGUFLoader
 from ktransformers.util.utils import InferenceState
 from transformers.configuration_utils import PretrainedConfig
+from ktransformers.models.modeling_glm4_moe import Glm4MoeRotaryEmbedding
 import torch
 
 # Copied from transformers.models.mixtral.modeling_mixtral.MixtralRotaryEmbedding with Mixtral->Qwen2Moe

@@ -16,30 +16,32 @@ import torch.utils.checkpoint
 from torch import nn
 from ktransformers.server.balance_serve.inference.forward_batch import ForwardBatchInput, ForwardBatchOutput
 from ktransformers.models.custom_cache import KGQACache
-from ktransformers.models.modeling_qwen3_moe import Qwen3MoeModel, Qwen3MoePreTrainedModel
-from ktransformers.models.configuration_qwen3_moe import Qwen3MoeConfig
+from ktransformers.models.modeling_qwen3_next import Qwen3NextModel, Qwen3NextPreTrainedModel
+from ktransformers.models.configuration_qwen3_next import Qwen3NextConfig
 from ktransformers.operators.flashinfer_batch_prefill_wrapper import flashInferAttn
 
 torch.set_grad_enabled(False)
 torch.set_default_dtype(torch.bfloat16)
 import flashinfer
 
-class KQwen3MoeForCausalLM(Qwen3MoePreTrainedModel):
+class KQwen3NextForCausalLM(Qwen3NextPreTrainedModel):
 
     cache: KGQACache
     use_cuda_graph = False
     def __init__(
         self,
-        config: Qwen3MoeConfig,
+        config: Qwen3NextConfig,
         cache = None,
     ):
         super().__init__(config)
-        self.model = Qwen3MoeModel(config)
+        self.model = Qwen3NextModel(config)
         self.config = config
         self.cache = cache
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.attn = [None] * 100
+        self.conv_states = [None for _ in range(config.num_hidden_layers)]
+        self.recurrent_states = [None for _ in range(config.num_hidden_layers)]
         
     def init_wrapper(self, use_cuda_graph, device, max_batch_token, max_batch_size, max_pages, cuda_graph_idx = 0):
         self.attn[cuda_graph_idx] = flashInferAttn(use_cuda_graph=use_cuda_graph, max_batch_token=max_batch_token, max_batch_size=max_batch_size, max_pages=max_pages, device=device)
@@ -49,15 +51,19 @@ class KQwen3MoeForCausalLM(Qwen3MoePreTrainedModel):
         features = []
         for i in range(batch.batch_size):
             tokens = batch.minibatch.tokens.contiguous()
-            embed_device = next(self.model.embed_tokens.parameters()).device
             feature = (
-                self.model.embed_tokens(tokens.to(embed_device))
+                self.model.embed_tokens(tokens.to(torch.device('cpu')))
                 .to(torch.bfloat16)
                 .to(device=device)
             )
             features.append(feature)
 
         return features
+
+    def reset_conv_states(self):
+        for i in range(self.config.num_hidden_layers):
+            self.conv_states[i] = None
+            self.recurrent_states[i] = None
 
 
     def forward(
@@ -74,41 +80,41 @@ class KQwen3MoeForCausalLM(Qwen3MoePreTrainedModel):
 
         forward_batch_output = ForwardBatchOutput()
 
-        
+        q_len = features[0].size(0)
+        if q_len > 1:
+            self.reset_conv_states()
+
         hidden_states = features[0]
         self.attn[cuda_graph_idx].calc_batch_indices(hidden_states.shape[0])
+        freqs_cis = self.model.rotary_emb(hidden_states.unsqueeze(0), batch.minibatch.position_ids.unsqueeze(0))
 
-        with torch.cuda.stream(current_stream):
-            residual = torch.zeros_like(hidden_states)
-            for i, decode_layer in enumerate(self.model.layers):
-                if self.model.transfer_map is not None and i in self.model.transfer_map:
-                    prev_stream = torch.cuda.current_stream()
-                    cur_device = self.model.transfer_map[i]
-                    if cur_device not in self.model.stream_device_map:
-                        self.model.stream_device_map[cur_device] = torch.cuda.Stream(cur_device)
-                    torch.cuda.set_device(cur_device)
-                    self.model.stream_device_map[cur_device].wait_stream(prev_stream)
-                    torch.cuda.set_stream(self.model.stream_device_map[cur_device])
-                    hidden_states = hidden_states.to(
-                        self.model.transfer_map[i], non_blocking=True
-                    )
+        residual = torch.zeros_like(hidden_states)
+        for i, decode_layer in enumerate(self.model.layers):
+            hidden_states = hidden_states.contiguous().clone()   # 断开别名 + 连续
+            residual      = residual.contiguous().clone()
 
-                    batch.minibatch.position_ids = (
-                        batch.minibatch.position_ids.to(self.model.transfer_map[i], non_blocking=True)
-                        if batch.minibatch.position_ids is not None
-                        else None
-                    )
-                hidden_states, residual = decode_layer.input_layernorm(hidden_states, num_tokens_tensors, residual)
-                hidden_states = decode_layer.self_attn(hidden_states, self.cache, 
-                                                       position_ids=batch.minibatch.position_ids, 
-                                                       wrapper=self.attn[cuda_graph_idx], bsz_tensors=num_tokens_tensors, 
-                                                       page_idx=page_idx,
-                                                       page_offset=page_offset
-                                                       )
+            hidden_states, residual = decode_layer.input_layernorm(hidden_states, num_tokens_tensors, residual)
+            hidden_states = hidden_states.contiguous()
+            residual = residual.contiguous()
 
-                hidden_states, residual = decode_layer.post_attention_layernorm(hidden_states, num_tokens_tensors, residual)
-                hidden_states = decode_layer.mlp(hidden_states.unsqueeze(0), num_tokens_tensors, cuda_graph_idx)
-                hidden_states = hidden_states.squeeze(0)
+            if self.config.layer_types[i] != "linear_attention":
+                hidden_states = decode_layer.self_attn(hidden_states, self.cache, freqs_cis,
+                                                    wrapper=self.attn[cuda_graph_idx],
+                                                    bsz_tensors=num_tokens_tensors)
+            else:
+                hs = hidden_states.unsqueeze(0).contiguous().clone()
+                hs = decode_layer.linear_attn(hs, self.conv_states, self.recurrent_states,
+                                            bsz_tensors=num_tokens_tensors)
+                hidden_states = hs.squeeze(0).contiguous()
+
+            hidden_states, residual = decode_layer.post_attention_layernorm(hidden_states, num_tokens_tensors, residual)
+
+            hs2 = hidden_states.unsqueeze(0).contiguous().clone()
+            hidden_states = decode_layer.mlp(hs2, num_tokens_tensors, cuda_graph_idx).squeeze(0).contiguous()
+
+            if not torch.isfinite(hidden_states).all():
+                raise RuntimeError(f"NaN after layer {i}")
+            # print(f"Layer {i} output: {hidden_states}")
         forward_batch_output = ForwardBatchOutput()
         with torch.cuda.stream(current_stream):
             local_logit = self.lm_head(self.model.norm(hidden_states, num_tokens_tensors, residual)[0], num_tokens_tensors)
