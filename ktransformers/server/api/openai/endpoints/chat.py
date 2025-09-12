@@ -56,7 +56,7 @@ router = APIRouter()
 
 @router.get('/models', tags=['openai'])
 async def list_models():
-    return {"data": [{"id": Config().model_name, "name": Config().model_name}], "object": "list"}
+    return {"data": [{"id": Config().model_name, "name": Config().model_name}], "object": "list", "owned_by": "LKtransformers"}
 
 def getTools(buffer):
     tool_calls_begin_marker = "<｜tool▁calls▁begin｜>"

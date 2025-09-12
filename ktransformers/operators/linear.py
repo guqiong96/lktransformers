@@ -89,10 +89,17 @@ class KLinearBase(ABC):
             if isinstance(self.gguf_loader, SafeTensorLoader):
                 # using safetensor_loader
                 tensor = self.gguf_loader.load_tensor(key+'.weight')
+                try:
+                    bias = self.gguf_loader.load_tensor(key+'.bias')
+                except:
+                    bias = None
                 if self.gguf_loader.has_tensor(key+'.weight_scale_inv'):
                     weight_scale_inv = self.gguf_loader.load_tensor(key+'.weight_scale_inv')
                     return nn.Parameter(tensor), nn.Parameter(weight_scale_inv)
-                return nn.Parameter(tensor)
+                if bias is not None:
+                    return nn.Parameter(tensor), nn.Parameter(bias)
+                else:
+                    return nn.Parameter(tensor)
                 
             elif self.gguf_loader.has_tensor(key + ".weight") or "kv_b_proj" in key:
                 if key + ".bias" in self.gguf_loader.tensor_file_map:
@@ -1017,7 +1024,9 @@ class KLinearCPUInfer(KLinearBase):
         del weight
 
     def load_weights(self, w: dict | nn.Parameter | tuple | None = None, device: str = "cpu"):
-        key = translate_name_to_gguf(self.key + ".weight")
+        if ".post_attention_norm." in self.key:
+            model_arch = "glm4"
+        key = translate_name_to_gguf(self.key + ".weight", model_arch)
         if self.gguf_loader.has_tensor(self.key + ".weight"):
             if self.key + ".bias" in self.gguf_loader.tensor_file_map:
                 weight = self.gguf_loader.get_tensor_bytes(self.key + ".weight")

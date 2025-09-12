@@ -44,8 +44,7 @@ class SafeTensorLoader(ModelLoader):
     def __init__(self, file_path: str):
         self.__load_tensor_file_map(file_path)
 
-    def __load_tensor_file_map(self, file_path: str):
-        # 处理传入路径，确保是文件夹路径
+    def __load_tensor_file_map(self, file_path: str): 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Path not found: {file_path}")
         if os.path.isfile(file_path):
@@ -138,8 +137,13 @@ class SafeTensorLoader(ModelLoader):
             base_key = key  # e.g. "model.layers.3.mlp.experts"
             experts_count = 0
             
+            key_no_proj = False
+            if self.has_tensor(f"{base_key}.{experts_count}.up.weight"):
+                key_no_proj = True
+
             # First, count how many experts we have by checking for expert 0's up_proj
-            while self.has_tensor(f"{base_key}.{experts_count}.up_proj.weight"):
+            while self.has_tensor(f"{base_key}.{experts_count}.up_proj.weight") or self.has_tensor(f"{base_key}.{experts_count}.up.weight"):
+          
                 experts_count += 1
             
             if experts_count == 0:
@@ -152,9 +156,14 @@ class SafeTensorLoader(ModelLoader):
             
             # Load all expert weights
             for expert_id in range(experts_count):
-                up_key = f"{base_key}.{expert_id}.up_proj.weight"
-                gate_key = f"{base_key}.{expert_id}.gate_proj.weight"
-                down_key = f"{base_key}.{expert_id}.down_proj.weight"
+                if key_no_proj:
+                    up_key = f"{base_key}.{expert_id}.up.weight"
+                    gate_key = f"{base_key}.{expert_id}.gate.weight"
+                    down_key = f"{base_key}.{expert_id}.down.weight"
+                else:
+                    up_key = f"{base_key}.{expert_id}.up_proj.weight"
+                    gate_key = f"{base_key}.{expert_id}.gate_proj.weight"
+                    down_key = f"{base_key}.{expert_id}.down_proj.weight"
                 
                 up_tensor = self.load_tensor(up_key, device)
                 gate_tensor = self.load_tensor(gate_key, device)
@@ -368,10 +377,11 @@ class GGUFLoader(ModelLoader):
         for name in tensor_info:
             self.tensor_file_map[name] = f.name
         self.tensor_info.update(tensor_info)
-        self.gguf_file_meta.update(info)
+        self.gguf_file_meta.update(info) 
+        self.model_arch = self.gguf_file_meta.get("general.architecture")
     
     def get_mmap_tensor(self, name):
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         t = self.tensor_info[name]
         mmap_data = self.file_data_map[ self.tensor_file_map[name] ]
 
@@ -382,24 +392,20 @@ class GGUFLoader(ModelLoader):
         return mmap_data[offset : offset + itemsize * item_count]
     
     def get_tensor_bytes(self, name: str) -> bytes:
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         t = self.tensor_info[name]
         file_path = self.tensor_file_map[name]
         
-        # 计算数据类型和所需字节数
         dtype = np.dtype(t["item_type"])
         num_bytes = dtype.itemsize * t["item_count"]
         offset = t["offset"]
         
-        # 直接读取文件内容
         with open(file_path, 'rb') as f:
-            # 跳转到指定偏移位置
             f.seek(offset)
-            # 读取精确数量的字节
             return f.read(num_bytes)
         
     def get_undequanted_tensor_and_ggml_type(self, name):
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         t = self.tensor_info[name]
         data = self.get_tensor_bytes(name)
         ggml_type = t["ggml_type"]
@@ -407,7 +413,7 @@ class GGUFLoader(ModelLoader):
         return data, ggml_type
 
     def load_expert_tensor(self, name, data, expert_id, elements_per_expert, device = "cuda", target_dtype = torch.get_default_dtype())->torch.Tensor:
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         t = self.tensor_info[name]
         shape = t["shape"]
         ggml_type = t["ggml_type"]
@@ -436,7 +442,7 @@ class GGUFLoader(ModelLoader):
         return values
 
     def load_gguf_tensor(self, name: str, device:str = "cpu", target_dtype = None)->torch.Tensor:
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         t = self.tensor_info[name]
         if target_dtype == None:
             target_dtype = torch.get_default_dtype()
@@ -501,11 +507,11 @@ class GGUFLoader(ModelLoader):
             .reshape(values.shape))
         return values
     def has_tensor(self, name: str):
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         return name in self.tensor_info
 
     def get_ggml_type(self, name: str):
-        name = translate_name_to_gguf(name)
+        name = translate_name_to_gguf(name, self.model_arch)
         if name not in self.tensor_info:
             raise KeyError(f"Key {name} not found in GGUF files")
         return self.tensor_info[name]["ggml_type"]

@@ -655,7 +655,7 @@ def translate_name_to_gguf_mixtral(name):
     
     return new_name
 
-def translate_name_to_gguf(name):
+def translate_name_to_gguf(name, model_arch):
 
     name = translate_name_to_gguf_mixtral(name)
 
@@ -668,7 +668,10 @@ def translate_name_to_gguf(name):
     name = name.replace(".mlp.down_proj", ".ffn_down")
     name = name.replace(".mlp.gate_proj", ".ffn_gate")
     name = name.replace(".mlp.up_proj", ".ffn_up")
-    name = name.replace(".post_attention_layernorm", ".ffn_norm")
+    if(model_arch == "glm4moe"):
+        name = name.replace(".post_attention_layernorm", ".post_attention_norm")
+    else:
+        name = name.replace(".post_attention_layernorm", ".ffn_norm")
     name = name.replace(".self_attn.q_proj", ".attn_q")
     name = name.replace(".self_attn.k_proj", ".attn_k")
     name = name.replace(".self_attn.v_proj", ".attn_v")

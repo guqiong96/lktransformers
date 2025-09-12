@@ -87,13 +87,27 @@ def custom_openapi(app):
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-
-def start_fast_api(cfg, args, generated_token_queue:Queue = None, broadcast_endpoint: str = None, kvcache_event: Event = None):
+ 
+def start_fast_api(cfg, args, generated_token_queue:Queue = None, start_event: Event = None, kvcache_event: Event = None):
     
-    interface = create_interface(config=cfg, default_args=cfg)
+    if kvcache_event is not None:
+        print("Waiting for kvcache initialization to complete...")
+        kvcache_event.wait()
+        print("kvcache initialization completed.")
+     
+    if start_event is not None:
+        print("Waiting for engine to start...")
+        start_event.wait()
+        print("Engine started.")
+            
+    cfg = Config()  
+    for key, value in vars(args).items():
+        if value is not None and hasattr(cfg, key):
+            setattr(cfg, key, value)
+            
+    interface = create_interface(config=cfg, default_args=args)
     
     setattr(interface, "token_queue", generated_token_queue)
-    setattr(interface, "broadcast_endpoint", broadcast_endpoint)
      
     app = create_app()
     custom_openapi(app)
