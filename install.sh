@@ -38,6 +38,7 @@ pip install -r ktransformers/server/requirements.txt
 
 echo "Installing ktransformers"
 pip uninstall ktransformers -y
+pip uninstall transformers -y
 KTRANSFORMERS_FORCE_BUILD=TRUE pip install -v . --no-build-isolation
 
 if [ "$DEV_BACKEND" == "cuda" ]; then
