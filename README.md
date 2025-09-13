@@ -105,7 +105,7 @@ LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/s
 3. 定期合并主线获取最新特性
 
 
-![a42193311f0cf149b9204ea8f3ad37d6](https://github.com/user-attachments/assets/874b2c38-0edb-42b0-a017-0e5f7ec1294e)
+![WeChatGroup](WeChatGroup.png)
 
 
  
