@@ -205,12 +205,11 @@ Backend_NUMA::~Backend_NUMA() {
 
     for (A_ThreadState* state : thread_state_) {
         state->~A_ThreadState();
-        
-        // 释放对齐内存
-        #if __cpp_aligned_new >= 201606  // C++17 对齐 new
+         
+        #if __cpp_aligned_new >= 201606  // C++17  
             operator delete(state, std::align_val_t{64});
         #else
-            AlignedFree(state);  // 跨平台版本
+            AlignedFree(state);   
         #endif
     }
     thread_state_.clear();
@@ -270,8 +269,11 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
     for (int nid = 0; nid < numa_nodes_; nid++) {
         int n_tasks = (base + (nid < remain)) * k;  
         int n_threads = node_threads_[nid].size();
-        if (n_threads == 0 || n_tasks == 0) {
-            continue; 
+        if (n_threads == 0){
+            throw std::runtime_error("Backend_NUMA::do_k_work_stealing_job: n_threads == 0");
+        }
+        if(n_tasks == 0) {
+            continue;
         }
           
         int t_base= n_tasks / n_threads;
@@ -280,7 +282,7 @@ void Backend_NUMA::do_k_work_stealing_job(int k, int nth,
         for (int j = 0; j < n_threads; j++) { 
             int tid = node_threads_[nid][j];
             begin = end;
-            end = begin + t_base + (j < t_remain ? 1 : 0);
+            end = begin + t_base + (j < t_remain);
             if (begin >= end) { 
                 thread_state_[tid]->status.store(ThreadStatus::WAITING, std::memory_order_release);
                 thread_state_[tid]->end = -1; 
@@ -353,8 +355,6 @@ void Backend_NUMA::worker_thread(int thread_id) {
     int cpu_id = threads_info_[thread_id].cpu_id;
 
     assert(numa_node_ == numa_node_of_cpu(cpu_id));
-    //std::cout << "worker_thread init suscess, numa nodes: " << numa_nodes_ << " cpu_id:" << cpu_id << " thread_id:" << thread_id << std::endl;
-
     
     bind_to_cpu(cpu_id); 
     set_numa_mempolicy(numa_node_);

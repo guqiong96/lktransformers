@@ -167,15 +167,32 @@ class KExpertsCPU(KExpertsBase):
         self.gate_type = w["gate_type"]
         self.up_type = w["up_type"]
         self.down_type = w["down_type"]
-        gate_ptr = ctypes.addressof(
-            ctypes.cast(gate, ctypes.POINTER(ctypes.c_uint8)).contents
-        )
-        up_ptr = ctypes.addressof(
-            ctypes.cast(up, ctypes.POINTER(ctypes.c_uint8)).contents
-        )
-        down_ptr = ctypes.addressof(
-            ctypes.cast(down, ctypes.POINTER(ctypes.c_uint8)).contents
-        )
+        if isinstance(gate, np.ndarray):
+            gate_ptr = ctypes.addressof(
+                ctypes.cast(gate.ctypes.data, ctypes.POINTER(ctypes.c_uint8)).contents
+            )
+        else:
+            gate_ptr = ctypes.addressof(
+                ctypes.cast(gate, ctypes.POINTER(ctypes.c_uint8)).contents
+            )
+            
+        if isinstance(up, np.ndarray):
+            up_ptr = ctypes.addressof(
+                ctypes.cast(up.ctypes.data, ctypes.POINTER(ctypes.c_uint8)).contents
+            )
+        else:
+            up_ptr = ctypes.addressof(
+                ctypes.cast(up, ctypes.POINTER(ctypes.c_uint8)).contents
+            )
+            
+        if isinstance(down, np.ndarray):
+            down_ptr = ctypes.addressof(
+                ctypes.cast(down.ctypes.data, ctypes.POINTER(ctypes.c_uint8)).contents
+            )
+        else:
+            down_ptr = ctypes.addressof(
+                ctypes.cast(down, ctypes.POINTER(ctypes.c_uint8)).contents
+            )
         # print(self.gate_qtype, self.up_qtype, self.down_qtype)
         n_routed_experts = self.n_routed_experts
         self.cpu_infer = KExpertsCPU.CPU_INFER

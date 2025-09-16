@@ -134,7 +134,7 @@ class MOE {
 
     void* m_gate_input_;      //[ group_max_len * routed_expert_num * hidden_size //* ggml_type_size(ggml_internal_get_type_traits(gate_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(gate_type).vec_dot_type)]
     void* m_up_input_;        //[ group_max_len * routed_expert_num * hidden_size //* ggml_type_size(ggml_internal_get_type_traits(up_type).vec_dot_type) / ggml_blck_size(ggml_internal_get_type_traits(up_type).vec_dot_type)]
-    bool input_16_to_32;
+    bool use_fp32_buffer_;
  
 };
 
