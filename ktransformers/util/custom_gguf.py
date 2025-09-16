@@ -655,7 +655,7 @@ def translate_name_to_gguf_mixtral(name):
     
     return new_name
 
-def translate_name_to_gguf(name, model_arch):
+def translate_name_to_gguf(name, model_arch=None):
 
     name = translate_name_to_gguf_mixtral(name)
 
