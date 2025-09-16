@@ -1,6 +1,8 @@
 # LKtransformers - 开启NUMA内存占用不翻倍！AMX支持GGUF模型，内存占用不翻倍, 支持NUMA加速！
 
 [2025-09-05 AMX预览版：支持GGUF模型，内存占用不翻倍，支持NUMA加速，预览版q4量化测试通过， 优化了编译参数]
+![e8163807efefcda003b87ab567bd0488](https://github.com/user-attachments/assets/4ea39111-de19-487b-bb5c-91c456f3f211)
+
 
 [2025-08-29 将计算进程放主进程运行，接口、调度放子进程，方便调试及及时发现错误提示] 
 
