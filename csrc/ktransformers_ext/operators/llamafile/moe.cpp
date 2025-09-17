@@ -23,7 +23,7 @@ MOE::MOE(MOEConfig config) {
     
     config_ = config;
 
-    config_.stride = 16;
+    config_.stride = 32;
     use_fp32_buffer_ = false;
     #if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
     std::cout << "AMX enabled ...... " << std::endl;
