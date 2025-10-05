@@ -504,7 +504,7 @@ def dequantize_q2_k(data):
 def dequantize_q2_k_gpu(data, device:str ="cuda", target_dtype = torch.get_default_dtype()):
     block_size = GGML_BLOCK_SIZES["Q2_K"]
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["Q2_K"]
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     device = torch.device(device)
     # TODO: this and from_numpy in other functions will cause a warning saying that numpy is not writable, 
     # the best way to fix this is transfer ptr to KTransformersOps instead of Tensor.
@@ -556,7 +556,7 @@ def dequantize_q3_k(data):
 def dequantize_q3_k_gpu(data, device:str ="cuda", target_dtype = torch.get_default_dtype()):
     block_size = GGML_BLOCK_SIZES["Q3_K"]
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["Q3_K"]
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     device = torch.device(device)
     # TODO: this and from_numpy in other functions will cause a warning saying that numpy is not writable, 
     # the best way to fix this is transfer ptr to KTransformersOps instead of Tensor.
@@ -654,7 +654,7 @@ def dequantize_q5_k(data):
 def dequantize_q5_k_gpu(data, device:str ="cuda", target_dtype = torch.get_default_dtype()):
     block_size = GGML_BLOCK_SIZES["Q5_K"]
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["Q5_K"]
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     device = torch.device(device)
     # TODO: this and from_numpy in other functions will cause a warning saying that numpy is not writable, 
     # the best way to fix this is transfer ptr to KTransformersOps instead of Tensor.
@@ -756,7 +756,7 @@ def dequantize_iq4_xs_gpu(data: np.ndarray, device:str = "cuda", target_dtype = 
     ele_per_blk = GGML_ELEMENTS_PER_BLOCK["IQ4_XS"]
     device = torch.device(device)
     num_blocks = len(data) // block_size
-    data = np.frombuffer(data, dtype=data.dtype)
+    data = np.frombuffer(data, dtype=np.uint8)
     c_pointer = ctypes.addressof(ctypes.cast(data.ctypes.data, ctypes.POINTER(ctypes.c_int8)).contents)
     return KTransformersOps.dequantize_iq4_xs(c_pointer, data.size, block_size, ele_per_blk, device, target_dtype)
 
