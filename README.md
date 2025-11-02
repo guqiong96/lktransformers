@@ -162,12 +162,16 @@ LK_THREADS=62 python ~/Downloads/lktransformers/ktransformers/server/main.py \
 
   cd lktransformers
 
+  git pull
+
   git submodule update --init --recursive --force
+
+  USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
+  
 2. 更多安装问题请参考主线文档
 
+![30bdbcf3f5607c6ac609e2f114d282e2](https://github.com/user-attachments/assets/9e3eb53f-6fd8-47af-a972-a75a9ebf6b97)
 
-
-![90118eea5ff29b8975840b83b7168368](https://github.com/user-attachments/assets/1c13fa21-1c17-484a-b979-351881402bb2)
 
 
 
