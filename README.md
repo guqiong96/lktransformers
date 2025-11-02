@@ -135,7 +135,7 @@ LK_THREADS=62 python ~/Downloads/lktransformers/ktransformers/server/main.py \
     --port 8070 \
     --backend_type balance_serve \
     --chunk_size 1024 \
-    --memory_gpu_only true1
+    --memory_gpu_only true
 
 
 
