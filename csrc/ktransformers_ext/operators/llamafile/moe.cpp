@@ -763,19 +763,38 @@ void MOE::forward_many_m(int qlen, int k, const uint64_t* expert_ids, const floa
 
 void MOE::forward(int qlen, int k, const uint64_t* expert_ids, const float* weights, const void* input, void* output, int* batch_size_tensor, Backend* backend) {
 
-    qlen = batch_size_tensor[0];
-    
-    if (qlen < config_.group_min_len) {
-        for (int i = 0; i < qlen; i++) {
-            (this->*forward_one_impl)(k, expert_ids + i * k, weights + i * k, (uint8_t*)input + i * hidden_bytes, (uint8_t*)output + i * hidden_bytes, backend);
-        }
-        return;
+    int remaining_batch_size = batch_size_tensor[0];
+     
+    if (qlen != remaining_batch_size) {
+        qlen = remaining_batch_size;
     }
-    int forward_len = std::min(config_.group_max_len, qlen);
-    (this->*forward_many_impl)(forward_len, k, expert_ids, weights, input, output, backend);
-
-    batch_size_tensor[0] -= forward_len;
-    forward(qlen - forward_len, k, expert_ids + forward_len * k, weights + forward_len * k, (uint8_t*)input + forward_len * hidden_bytes, (uint8_t*)output + forward_len * hidden_bytes, batch_size_tensor, backend);
+     
+    int current_pos = 0;
+    while (remaining_batch_size > 0) {
+        if (remaining_batch_size < config_.group_min_len) { 
+            for (int i = 0; i < remaining_batch_size; i++) {
+                (this->*forward_one_impl)(k, 
+                                         expert_ids + (current_pos + i) * k, 
+                                         weights + (current_pos + i) * k, 
+                                         (uint8_t*)input + (current_pos + i) * hidden_bytes, 
+                                         (uint8_t*)output + (current_pos + i) * hidden_bytes, 
+                                         backend);
+            }
+            break; 
+        }
+         
+        int forward_len = std::min(config_.group_max_len, remaining_batch_size);
+         
+        (this->*forward_many_impl)(forward_len, 
+                                  k, 
+                                  expert_ids + current_pos * k, 
+                                  weights + current_pos * k, 
+                                  (uint8_t*)input + current_pos * hidden_bytes, 
+                                  (uint8_t*)output + current_pos * hidden_bytes, 
+                                  backend); 
+        remaining_batch_size -= forward_len;
+        current_pos += forward_len;
+    }
 }
  
 

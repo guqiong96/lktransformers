@@ -144,12 +144,17 @@ class Logger(object):
     def __init__(self, level: str = 'info'):
         fmt = '%(asctime)s %(levelname)s %(pathname)s[%(lineno)d] %(funcName)s: %(message)s'
         cfg: Config = Config()
-        filename: str = os.path.join(cfg.log_dir, cfg.log_file)
-        backup_count: int = cfg.backup_count
-        th = DailyRotatingFileHandler(filename=filename, when='MIDNIGHT', backupCount=backup_count, encoding="utf-8")
-        th.setFormatter(logging.Formatter(fmt))
-
-
+         
+        self.logger = logging.getLogger(cfg.log_file)
+        self.logger.handlers.clear()
+         
+        if cfg.log_dir and cfg.log_file:
+            filename: str = os.path.join(cfg.log_dir, cfg.log_file)
+            backup_count: int = cfg.backup_count
+            th = DailyRotatingFileHandler(filename=filename, when='MIDNIGHT', backupCount=backup_count, encoding="utf-8")
+            th.setFormatter(logging.Formatter(fmt))
+            self.logger.addHandler(th)
+         
         color_fmt = (
             '%(log_color)s%(asctime)s %(levelname)s %(pathname)s[%(lineno)d]: %(message)s'
         )
@@ -166,11 +171,10 @@ class Logger(object):
 
         sh = logging.StreamHandler()
         sh.setFormatter(color_formatter)
-
-        self.logger = logging.getLogger(filename)
-        self.logger.setLevel(self.level_relations.get(level)) # type: ignore
-        self.logger.addHandler(th)
         self.logger.addHandler(sh)
+         
+        self.logger.setLevel(self.level_relations.get(level)) 
+        self.logger.propagate = False
 
 
 logger = Logger(level=Config().log_level).logger

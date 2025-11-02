@@ -1,5 +1,7 @@
 # LKtransformers - 开启NUMA内存占用不翻倍！AMX支持GGUF模型，内存占用不翻倍, 支持NUMA加速！
 
+kimi k2 之后的模型支持停止，需要运行新模型，请移步到Lvllm项目：https://github.com/guqiong96/Lvllm
+ 
 [2025-09-05 AMX预览版：支持GGUF模型，内存占用不翻倍，支持NUMA加速，预览版q4量化测试通过， 优化了编译参数]
 ![e8163807efefcda003b87ab567bd0488](https://github.com/user-attachments/assets/4ea39111-de19-487b-bb5c-91c456f3f211)
 
@@ -56,53 +58,113 @@ RuntimeError: pidfd_getfd: Operation not permitted，使用PYTORCH_CUDA_ALLOC_CO
 
 ### 安装步骤
 
+1. 安装CUDA 12.8
+
+```bash
+# 卸载旧版本CUDA和NVIDIA驱动
+sudo /usr/local/cuda/bin/cuda-uninstaller
+sudo nvidia-uninstall
+
+# 下载并安装CUDA 12.8 
+wget https://developer.download.nvidia.com/compute/cuda/12.8.1/local_installers/cuda_12.8.1_570.124.06_linux.run
+sudo sh cuda_12.8.1_570.124.06_linux.run
+
+# 疑难问题
+如何彻底卸载系统自带cuda ：https://github.com/guqiong96/Lvllm/issues/5 
+```
+
+2. 创建并激活Python环境及一些系统库
+
+```bash
+conda create -n lktransformers python==3.12.11
+conda activate lktransformers
+
+# 升级libstdcxx-ng  
+conda install -c conda-forge libstdcxx-ng
+
+# 安装NUMA库 ubuntu
+sudo apt-get install libnuma-dev
+# 安装NUMA库 rocky linux
+sudo dnf install numactl-devel
+```
+
+3. 安装PyTorch 2.8.0 
+pip uninstall triton torchvision torch
+pip install triton torchvision torch==2.8.0
+ 
+
+4. 克隆仓库并安装依赖
+
 git clone --recursive https://github.com/guqiong96/lktransformers.git
+
+cd lktransformers
 
 git submodule update --init --recursive --force
 
 USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 
-### 更新源码
+### 如果已有源码安装成功过的更新升级步骤
+
+cd lktransformers
 
 git pull
 
-git submodule update --init --recursive --force
-
 USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
 
+源码第三方库不全的情况运行:
+
+cd lktransformers
+
+git submodule update --init --recursive --force
+
 ### 运行示例
-LK_POWER_SAVING=1 LK_THREADS=62 python ~/Downloads/KTransformers/ktransformers/server/main.py \
+LK_THREADS=62 python ~/Downloads/lktransformers/ktransformers/server/main.py \
     --gguf_path ~/Models/Kimi-K2-Instruct-GGUF  \
     --model_path ~/Models/Kimi-K2-Instruct-GGUF \
     --model_name Kimi-K2-Instruct-GGUF  \
     --cpu_infer 28 \
-    --max_new_tokens 16384 \
-    --cache_lens 18432 \
+    --max_new_tokens 8192 \
+    --cache_lens 16384 \
     --cache_q4 true \
     --temperature 0.6 \
     --top_p 0.95 \
-    --optimize_config_path ~/Downloads/KTransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat-serve.yaml \
+    --optimize_config_path ~/Downloads/lktransformers/ktransformers/optimize/optimize_rules/DeepSeek-V3-Chat-serve.yaml \
     --force_think \
     --use_cuda_graph \
     --host 0.0.0.0 \
     --port 8070 \
     --backend_type balance_serve \
-    --chunk_size 1024
+    --chunk_size 1024 \
+    --memory_gpu_only true1
 
-## 🔧 配置技巧
+
+
+## 🔧 优化设置
 
 - **NUMA 线程配置**：
   - 开启最多NUMA节点，AMD EPYC 开启 L3 As NUMA Domain 
 
 - **显存优化**：在 YAML 配置中使用 `VLinearMarlin16` 防止 16G 显卡显存溢出
 
+- **memory kv cache **： 部分模型允许使用参数 memory_gpu_only: false, 允许使用内存存储更大的kv cache
+
+
 ## 📌 注意事项
 
-1. 更新后出现疑难问题，在主目录运行 
+1. 更新后出现疑难问题
+  cd lktransformers
+
   git pull
+
   USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
+
+  源码第三方库不全的情况运行:
+
+  cd lktransformers
+
+  git submodule update --init --recursive --force
 2. 更多安装问题请参考主线文档
-3. 定期合并主线获取最新特性
+
 
 
 ![90118eea5ff29b8975840b83b7168368](https://github.com/user-attachments/assets/1c13fa21-1c17-484a-b979-351881402bb2)

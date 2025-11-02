@@ -1,4 +1,4 @@
-torch >= 2.3.0
+torch == 2.8.0
 transformers
 fastapi >= 0.111.0
 langchain >= 0.2.0
@@ -14,3 +14,4 @@ colorlog
 fire
 zmq
 psutil
+sqlalchemy
