@@ -169,8 +169,7 @@ LK_THREADS=62 python ~/Downloads/lktransformers/ktransformers/server/main.py \
   USE_BALANCE_SERVE=1 USE_NUMA=1 bash install.sh
   
 2. 更多安装问题请参考主线文档
-
-![30bdbcf3f5607c6ac609e2f114d282e2](https://github.com/user-attachments/assets/9e3eb53f-6fd8-47af-a972-a75a9ebf6b97)
+ 
 
 
 
